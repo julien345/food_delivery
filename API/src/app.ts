@@ -21,9 +21,7 @@ const app = express();
 
 app.use(cors({
   origin: [
-    'https://ais-dev-y4t4zak3gtcbjxm63x72dy-49964164836.europe-west2.run.app',
-    'https://ais-pre-y4t4zak3gtcbjxm63x72dy-49964164836.europe-west2.run.app',
-    'http://localhost:5173'
+    ENV.CORS_ORIGINS.split(','),
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
