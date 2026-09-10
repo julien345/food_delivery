@@ -8,4 +8,5 @@ export const ENV = {
   PORT: process.env.PORT || 3000,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   FRONTEND_URL: process.env.FRONTEND_URL,
+  CORS_ORIGINS: process.env.CORS_ORIGINS || '',
 };
