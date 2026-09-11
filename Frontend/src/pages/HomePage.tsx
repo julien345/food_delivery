@@ -28,6 +28,7 @@ import { Category, Dish } from '../types';
 import { DishCard } from '../components/common/DishCard';
 import { formatFCFA } from '../utils/format';
 import { getDishImageUrl, getCategoryImageUrl } from '../utils/image';
+import { NetflixLoader } from '../components/common/NetflixLoader';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '../store/auth.store';
 import { useAuthNoticeStore } from '../store/authNotice.store';
@@ -45,6 +46,8 @@ export const HomePage: React.FC = () => {
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [isSlowLoading, setIsSlowLoading] = useState(false);
   const [quickViewDish, setQuickViewDish] = useState<Dish | null>(null);
   const [modalQty, setModalQty] = useState(1);
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,6 +55,16 @@ export const HomePage: React.FC = () => {
 
   const { addItem, isLoading: cartLoading } = useCartStore();
   const { triggerAuthNotice } = useAuthNoticeStore();
+
+  // Indicateur si le serveur met du temps à répondre (ex: cold start)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (initialLoading) {
+        setIsSlowLoading(true);
+      }
+    }, 2400);
+    return () => clearTimeout(timer);
+  }, [initialLoading]);
 
   useEffect(() => {
     loadData();
@@ -62,8 +75,9 @@ export const HomePage: React.FC = () => {
     setCurrentPage(1);
   }, [selectedCategoryId, searchQuery]);
 
-  const loadData = async () => {
+  const loadData = async (attempt = 0) => {
     setLoading(true);
+    const startTime = Date.now();
     try {
       const catsPromise =
         categories.length === 0
@@ -72,43 +86,75 @@ export const HomePage: React.FC = () => {
 
       const dishesPromise = dishApi.getAll(
         selectedCategoryId
-          ? { categoryId: selectedCategoryId }
+          ? { categoryId: selectedCategoryId, limit: 100 }
           : { limit: 100 }
       );
 
-      const [catsRes, dishesRes] = await Promise.all([
+      const [catsRes, dishesRes] = await Promise.allSettled([
         catsPromise,
         dishesPromise,
       ]);
 
-      if (categories.length === 0) {
-        setCategories(Array.isArray(catsRes) ? catsRes : (catsRes as any)?.data || []);
+      let loadedCats: Category[] = [];
+      let catsSuccess = false;
+      if (catsRes.status === 'fulfilled') {
+        const rawCats = catsRes.value;
+        loadedCats = Array.isArray(rawCats) ? rawCats : (rawCats as any)?.data || [];
+        if (loadedCats.length > 0) {
+          setCategories(loadedCats);
+          catsSuccess = true;
+        }
       }
 
-      // L'API GET /dishes renvoie { data: Dish[], meta: any }
       let dishesArray: Dish[] = [];
-      if (
-        dishesRes &&
-        typeof dishesRes === 'object' &&
-        'data' in dishesRes &&
-        Array.isArray((dishesRes as any).data)
-      ) {
-        dishesArray = (dishesRes as any).data;
-      } else if (Array.isArray(dishesRes)) {
-        dishesArray = dishesRes;
-      } else if (
-        dishesRes &&
-        typeof dishesRes === 'object' &&
-        Array.isArray((dishesRes as any)?.data?.data)
-      ) {
-        dishesArray = (dishesRes as any).data.data;
+      let dishesSuccess = false;
+      if (dishesRes.status === 'fulfilled') {
+        const rawDishes = dishesRes.value;
+        if (
+          rawDishes &&
+          typeof rawDishes === 'object' &&
+          'data' in rawDishes &&
+          Array.isArray((rawDishes as any).data)
+        ) {
+          dishesArray = (rawDishes as any).data;
+        } else if (Array.isArray(rawDishes)) {
+          dishesArray = rawDishes;
+        } else if (
+          rawDishes &&
+          typeof rawDishes === 'object' &&
+          Array.isArray((rawDishes as any)?.data?.data)
+        ) {
+          dishesArray = (rawDishes as any).data.data;
+        }
+        dishesSuccess = true;
+        setDishes(dishesArray);
       }
-      setDishes(dishesArray);
+
+      // Si le serveur est en cours de réveil ou n'a pas encore retourné les catégories/plats
+      const needsRetry =
+        (!catsSuccess && categories.length === 0) ||
+        (!dishesSuccess && dishesArray.length === 0);
+
+      if (needsRetry && attempt < 2) {
+        console.info(`Attente des données du serveur... Retentative (${attempt + 1}/3)`);
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+        return loadData(attempt + 1);
+      }
     } catch (err) {
-      console.error('Erreur chargement catalogue', err);
-      setDishes([]);
+      console.warn(`Tentative ${attempt + 1} de chargement de la carte :`, err);
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        return loadData(attempt + 1);
+      }
     } finally {
+      // Garantit que le loader reste assez de temps pour récupérer et préparer toutes les données
+      const elapsed = Date.now() - startTime;
+      const minDuration = 1000;
+      if (elapsed < minDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
+      }
       setLoading(false);
+      setInitialLoading(false);
     }
   };
 
@@ -196,6 +242,15 @@ export const HomePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#fafaf9] pb-24">
+      {/* Netflix-Style Initial Splash Loader */}
+      {initialLoading && (
+        <NetflixLoader
+          fullScreen
+          size="lg"
+          message="Loading"
+        />
+      )}
+
       {/* Staff Consultation Banner for Admin and Delivery Agent */}
       {isStaffReadOnly && (
         <div className="bg-slate-900 border-b border-slate-800 text-white px-4 py-3 sticky top-20 z-30 shadow-md">
@@ -228,60 +283,64 @@ export const HomePage: React.FC = () => {
       )}
 
       {/* Hero Section */}
-      <section className="relative bg-slate-950 text-white pt-14 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800/60">
-        {/* Subtle decorative background gradients */}
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-10 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none" />
+      <section className="relative bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white pt-12 sm:pt-16 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden border-b border-slate-800/80">
+        {/* Subtle decorative background lights and grid */}
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-0 right-10 w-[500px] h-[500px] bg-amber-500/10 rounded-full blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 opacity-[0.04] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:28px_28px] pointer-events-none" />
 
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-center">
             {/* Hero Text */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 text-amber-300 text-xs font-bold backdrop-blur-md shadow-xs">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.07] border border-white/15 text-amber-300 text-xs font-bold backdrop-blur-md shadow-xs">
                 <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span className="tracking-wide">L'Excellence Culinaire de Douala</span>
+                <span className="tracking-wide">L'Excellence Culinaire à Douala</span>
               </div>
 
-              <h1 className="font-display text-3xl sm:text-4xl lg:text-5xl font-black tracking-tight leading-[1.15] text-white">
-                Bienvenue chez Julien's Food, la toute nouvelle reference culinaire du coin.
+              <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-[1.1] text-white">
+                Bienvenue chez{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-orange-400 to-amber-200">
+                  Julien's Food
+                </span>
               </h1>
 
               <p className="text-sm sm:text-base text-slate-300 max-w-2xl mx-auto lg:mx-0 leading-relaxed font-normal">
-                vous allez decouvrir un menu varies avec de la cuisine camerounaise,europeene et bien d'autres
+                Découvrez un menu varié d'exception préparé à la commande : cuisine camerounaise authentique, spécialités européennes raffinées et grillades savoureuses livrées chez vous.
               </p>
 
               {/* Douala Trust Badges */}
-              <div className="pt-1 flex flex-wrap items-center justify-center lg:justify-start gap-3 text-xs text-slate-300">
-                <div className="flex items-center gap-2 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 backdrop-blur-xs">
-                  <Clock className="w-4 h-4 text-amber-400" />
+              <div className="pt-1 flex flex-wrap items-center justify-center lg:justify-start gap-2.5 sm:gap-3 text-xs text-slate-300">
+                <div className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.09] px-3.5 py-2 rounded-2xl border border-white/10 backdrop-blur-md transition">
+                  <Clock className="w-4 h-4 text-amber-400 shrink-0" />
                   <span className="font-semibold">Livraison rapide 30-45 min</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 backdrop-blur-xs">
-                  <MapPin className="w-4 h-4 text-blue-400" />
+                <div className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.09] px-3.5 py-2 rounded-2xl border border-white/10 backdrop-blur-md transition">
+                  <MapPin className="w-4 h-4 text-blue-400 shrink-0" />
                   <span className="font-semibold">Tout Douala (Akwa, Bonapriso...)</span>
                 </div>
-                <div className="flex items-center gap-2 bg-white/5 px-3.5 py-2 rounded-xl border border-white/10 backdrop-blur-xs">
-                  <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                <div className="flex items-center gap-2 bg-white/[0.06] hover:bg-white/[0.09] px-3.5 py-2 rounded-2xl border border-white/10 backdrop-blur-md transition">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span className="font-semibold">Paiement 100% sécurisé</span>
                 </div>
               </div>
 
               {/* Search Box with Suggestions */}
               <div className="pt-2 max-w-xl mx-auto lg:mx-0 space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <div className="relative group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Rechercher un plat (Ndolè, Poulet DG, Poisson braisé...)"
-                    className="w-full pl-12 pr-10 py-4 bg-white/95 text-slate-950 rounded-2xl shadow-xl text-sm font-medium focus:outline-none focus:ring-3 focus:ring-blue-500 focus:bg-white placeholder:text-slate-400 border border-white/20 transition"
+                    className="w-full pl-12 pr-10 py-4 bg-white/95 text-slate-950 rounded-2xl shadow-xl text-sm font-medium focus:outline-none focus:ring-3 focus:ring-amber-400/50 focus:bg-white placeholder:text-slate-400 border border-white/30 transition"
                   />
                   {searchQuery && (
                     <button
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold p-1"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold p-1 cursor-pointer"
+                      title="Effacer la recherche"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -291,11 +350,11 @@ export const HomePage: React.FC = () => {
                 {/* Quick suggestions pills */}
                 <div className="flex items-center gap-2 flex-wrap text-xs text-slate-400 justify-center lg:justify-start">
                   <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Populaire :</span>
-                  {['Ndolè', 'Eru', 'napolitaine', 'Koki', 'Poulet DG'].map((keyword) => (
+                  {['Ndolè', 'Eru', 'Poisson braisé', 'Poulet DG', 'Koki'].map((keyword) => (
                     <button
                       key={keyword}
                       onClick={() => setSearchQuery(keyword)}
-                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white border border-white/10 transition-colors text-[11px] font-semibold cursor-pointer"
+                      className="px-2.5 py-1 rounded-xl bg-white/[0.07] hover:bg-white/15 text-slate-300 hover:text-amber-300 border border-white/10 transition-all text-[11px] font-semibold cursor-pointer active:scale-95"
                     >
                       {keyword}
                     </button>
@@ -304,9 +363,9 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Hero Visual Card (Specialty of the day) */}
+            {/* Hero Visual Card (Specialty of the day) - Desktop */}
             <div className="lg:col-span-5 hidden lg:block">
-              <div className="relative group bg-gradient-to-br from-slate-900 to-slate-950 rounded-3xl p-5 border border-slate-800 shadow-2xl space-y-4 ring-1 ring-white/10">
+              <div className="relative group bg-gradient-to-br from-slate-900/90 to-slate-950/90 backdrop-blur-xl rounded-3xl p-5 border border-white/10 shadow-2xl space-y-4 ring-1 ring-white/10">
                 <div className="relative rounded-2xl overflow-hidden aspect-16/10 shadow-lg">
                   <img
                     src="https://res.cloudinary.com/tbygpchx/image/upload/v1788391631/camerounais.jpg"
@@ -314,12 +373,39 @@ export const HomePage: React.FC = () => {
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
-                  
-                  
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none" />
+
+                  {/* Float Badges */}
+                  <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-amber-300 text-xs font-black flex items-center gap-1.5 shadow-md">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Coup de cœur Douala</span>
+                  </div>
+
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
+                    <div>
+                      <p className="text-xs font-semibold text-amber-300">Spécialité du Chef</p>
+                      <h4 className="font-display text-base font-black tracking-tight drop-shadow-md">
+                        Ndolè Royal aux Crevettes
+                      </h4>
+                    </div>
+                    <div className="bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-1 rounded-xl shadow-md">
+                      4.9 ★
+                    </div>
+                  </div>
                 </div>
 
-                
+                <div className="flex items-center justify-between pt-1">
+                  <div className="text-xs text-slate-400">
+                    <span className="text-white font-bold">Frais & cuisiné à la commande</span>
+                    <span className="block text-[11px] text-slate-400">Saveurs authentiques garanties</span>
+                  </div>
+                  <a
+                    href="#dishes-catalog-section"
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+                  >
+                    Découvrir la carte
+                  </a>
+                </div>
               </div>
             </div>
           </div>
@@ -329,167 +415,283 @@ export const HomePage: React.FC = () => {
       {/* Main Catalog Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-7">
         {/* Modern Aesthetic Categories Showcase */}
-        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-4 sm:p-5 shadow-xl shadow-slate-200/50 border border-slate-200/80 mb-10 ring-1 ring-black/[0.02]">
-          <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-              <h3 className="font-display text-sm sm:text-base font-black text-slate-900 tracking-tight uppercase">
-                Nos Univers Culinaires
-              </h3>
-              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/60">
-                {categories.length + 1} univers
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl p-3.5 sm:p-5 shadow-xl shadow-slate-200/50 border border-slate-200/80 mb-10 ring-1 ring-black/[0.02]">
+          
+          {/* MOBILE DISPLAY (Ultra Aesthetic Stories / Bubble Pills) */}
+          <div className="block sm:hidden">
+            {/* Mobile Categories Top Header */}
+            <div className="flex items-center justify-between gap-2 mb-3 px-1">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-xs font-black text-slate-900 tracking-tight uppercase">
+                  Univers Culinaires
+                </span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  {categories.length + 1}
+                </span>
+              </div>
               {selectedCategoryId && (
                 <button
                   onClick={() => setSelectedCategoryId(null)}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-100"
+                  className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full flex items-center gap-1 transition cursor-pointer border border-blue-100 shadow-2xs"
                 >
-                  <span className="hidden sm:inline">Afficher toute la carte</span>
-                  <span className="sm:hidden">Tous</span>
-                  <X className="w-3.5 h-3.5" />
+                  <span>Tous</span>
+                  <X className="w-3 h-3" />
                 </button>
               )}
+            </div>
 
-              {/* Navigation arrows for categories */}
-              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 sm:p-1 rounded-xl border border-slate-200/70">
-                <button
-                  type="button"
-                  id="cat-scroll-left-btn"
-                  onClick={() => scrollCategories('left')}
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
-                  title="Défiler vers la gauche"
-                  aria-label="Défiler vers la gauche"
+            {/* Mobile Categories Touch Strip */}
+            <div className="flex items-start gap-3 overflow-x-auto pb-2 pt-1 px-1 no-scrollbar scroll-smooth">
+              {/* Category "Tous" on mobile */}
+              <button
+                id="filter-category-all-mobile"
+                onClick={() => setSelectedCategoryId(null)}
+                className="flex flex-col items-center gap-1.5 shrink-0 min-w-[72px] max-w-[90px] cursor-pointer group active:scale-95 transition-transform select-none"
+              >
+                <div
+                  className={`w-[58px] h-[58px] rounded-2xl p-0.5 transition-all duration-300 flex items-center justify-center ${
+                    selectedCategoryId === null
+                      ? 'ring-2 ring-blue-600 ring-offset-2 ring-offset-white bg-gradient-to-tr from-slate-950 via-blue-900 to-indigo-900 shadow-md shadow-blue-600/30 scale-105'
+                      : 'bg-gradient-to-tr from-slate-900 to-slate-800 border border-slate-700/60 shadow-xs'
+                  }`}
                 >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  id="cat-scroll-right-btn"
-                  onClick={() => scrollCategories('right')}
-                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
-                  title="Défiler vers la droite"
-                  aria-label="Défiler vers la droite"
+                  <div className="w-full h-full rounded-[13px] flex flex-col items-center justify-center text-white">
+                    <UtensilsCrossed className="w-5 h-5 text-amber-300" />
+                    <span className="text-[9px] font-black text-amber-200 mt-0.5">{safeDishes.length}</span>
+                  </div>
+                </div>
+                <span
+                  className={`text-[11px] leading-snug text-center font-bold tracking-tight line-clamp-2 break-words w-full px-0.5 ${
+                    selectedCategoryId === null ? 'text-blue-700 font-black' : 'text-slate-700'
+                  }`}
                 >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
+                  Tous
+                </span>
+                {selectedCategoryId === null && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 -mt-1" />
+                )}
+              </button>
+
+              {/* Individual categories on mobile */}
+              {categories.map((cat) => {
+                const isSelected = selectedCategoryId === cat.id;
+                const catImageResolved = getCategoryImageUrl(cat.image);
+                const countInCat = safeDishes.filter(
+                  (d) => d.categoryId === cat.id || d.category?.id === cat.id
+                ).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    id={`filter-category-mobile-${cat.id}`}
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className="flex flex-col items-center gap-1.5 shrink-0 min-w-[74px] max-w-[94px] cursor-pointer group active:scale-95 transition-transform select-none"
+                  >
+                    <div
+                      className={`w-[58px] h-[58px] rounded-2xl p-0.5 transition-all duration-300 ${
+                        isSelected
+                          ? 'ring-2 ring-blue-600 ring-offset-2 ring-offset-white shadow-md shadow-blue-600/30 scale-105'
+                          : 'bg-white border border-slate-200/90 shadow-xs'
+                      }`}
+                    >
+                      <div className="w-full h-full rounded-[13px] overflow-hidden relative bg-slate-100 flex items-center justify-center">
+                        {catImageResolved ? (
+                          <img
+                            src={catImageResolved}
+                            alt={cat.name}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center text-amber-600">
+                            {getCategoryFallbackIcon(cat.name)}
+                          </div>
+                        )}
+                        <span className="absolute bottom-0.5 right-0.5 bg-slate-950/80 backdrop-blur-xs text-white text-[8px] font-black px-1 py-0.2 rounded-md leading-none">
+                          {countInCat}
+                        </span>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[11px] leading-snug text-center font-bold tracking-tight line-clamp-2 break-words w-full px-0.5 ${
+                        isSelected ? 'text-blue-700 font-black' : 'text-slate-700'
+                      }`}
+                      title={cat.name}
+                    >
+                      {cat.name}
+                    </span>
+                    {isSelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-600 -mt-1" />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Cards Carousel Strip */}
-          <div
-            ref={categoryScrollRef}
-            className="flex items-stretch gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth"
-          >
-            {/* Master card: Toute la carte */}
-            <button
-              id="filter-category-all"
-              onClick={() => setSelectedCategoryId(null)}
-              className={`shrink-0 min-w-[112px] sm:min-w-[160px] p-2.5 sm:p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between gap-2.5 sm:gap-3 cursor-pointer group select-none bg-gradient-to-br ${
-                selectedCategoryId === null
-                  ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 ring-2 ring-blue-500/30 -translate-y-0.5'
-                  : 'bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200/80 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div
-                  className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center transition-colors ${
-                    selectedCategoryId === null
-                      ? 'bg-blue-600 text-white shadow-xs'
-                      : 'bg-white text-slate-700 shadow-xs border border-slate-200/70 group-hover:text-blue-600 group-hover:border-blue-200'
-                  }`}
-                >
-                  <Utensils className="w-4 h-4 sm:w-5 sm:h-5 text-amber-400" />
+          {/* DESKTOP DISPLAY (Classic Aesthetic Grid Cards Carousel) */}
+          <div className="hidden sm:block">
+            <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
+                <h3 className="font-display text-base font-black text-slate-900 tracking-tight uppercase">
+                  Nos Univers Culinaires
+                </h3>
+                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200/60">
+                  {categories.length + 1} univers
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCategoryId && (
+                  <button
+                    onClick={() => setSelectedCategoryId(null)}
+                    className="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-100"
+                  >
+                    <span>Afficher toute la carte</span>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Navigation arrows for categories */}
+                <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+                  <button
+                    type="button"
+                    id="cat-scroll-left-btn"
+                    onClick={() => scrollCategories('left')}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
+                    title="Défiler vers la gauche"
+                    aria-label="Défiler vers la gauche"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    id="cat-scroll-right-btn"
+                    onClick={() => scrollCategories('right')}
+                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
+                    title="Défiler vers la droite"
+                    aria-label="Défiler vers la droite"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </div>
-                <span
-                  className={`text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full ${
-                    selectedCategoryId === null
-                      ? 'bg-white/15 text-white'
-                      : 'bg-slate-200/80 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700'
-                  }`}
-                >
-                  {safeDishes.length}
-                </span>
               </div>
-              <div>
-                <span className="font-display font-black text-[11px] sm:text-sm block tracking-tight leading-snug">
-                  Toute la carte
-                </span>
-                <span
-                  className={`text-[9px] sm:text-[10px] font-medium block mt-0.5 ${
-                    selectedCategoryId === null ? 'text-slate-300' : 'text-slate-400'
-                  }`}
-                >
-                  Tous les délices
-                </span>
-              </div>
-            </button>
+            </div>
 
-            {/* Individual Categories */}
-            {categories.map((cat) => {
-              const isSelected = selectedCategoryId === cat.id;
-              const catImageResolved = getCategoryImageUrl(cat.image);
-              const countInCat = safeDishes.filter(
-                (d) => d.categoryId === cat.id || d.category?.id === cat.id
-              ).length;
+            {/* Cards Carousel Strip Desktop */}
+            <div
+              ref={categoryScrollRef}
+              className="flex items-stretch gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth"
+            >
+              {/* Master card: Toute la carte */}
+              <button
+                id="filter-category-all"
+                onClick={() => setSelectedCategoryId(null)}
+                className={`shrink-0 min-w-[160px] p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between gap-3 cursor-pointer group select-none ${
+                  selectedCategoryId === null
+                    ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 ring-2 ring-blue-500/40 -translate-y-0.5'
+                    : 'bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200/80 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${
+                      selectedCategoryId === null
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-white text-slate-700 shadow-xs border border-slate-200/70 group-hover:text-blue-600 group-hover:border-blue-200'
+                    }`}
+                  >
+                    <Utensils className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <span
+                    className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                      selectedCategoryId === null
+                        ? 'bg-white/20 text-white'
+                        : 'bg-slate-200/80 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700'
+                    }`}
+                  >
+                    {safeDishes.length}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-display font-black text-sm block tracking-tight leading-snug">
+                    Toute la carte
+                  </span>
+                  <span
+                    className={`text-[10px] font-medium block mt-0.5 ${
+                      selectedCategoryId === null ? 'text-slate-300' : 'text-slate-400'
+                    }`}
+                  >
+                    Tous les délices
+                  </span>
+                </div>
+              </button>
 
-              return (
-                <button
-                  key={cat.id}
-                  id={`filter-category-${cat.id}`}
-                  onClick={() => setSelectedCategoryId(cat.id)}
-                  className={`shrink-0 min-w-[112px] sm:min-w-[160px] p-2.5 sm:p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between gap-2.5 sm:gap-3 cursor-pointer group select-none bg-gradient-to-br ${
-                    isSelected
-                      ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 ring-2 ring-blue-500/30 -translate-y-0.5'
-                      : 'bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200/80 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div
-                      className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl overflow-hidden flex items-center justify-center transition-colors ${
-                        isSelected
-                          ? 'bg-blue-600 text-white shadow-xs'
-                          : 'bg-white text-slate-700 shadow-xs border border-slate-200/70 group-hover:text-blue-600 group-hover:border-blue-200'
-                      }`}
-                    >
-                      {catImageResolved ? (
-                        <img
-                          src={catImageResolved}
-                          alt={cat.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        getCategoryFallbackIcon(cat.name)
-                      )}
+              {/* Individual Categories Desktop */}
+              {categories.map((cat) => {
+                const isSelected = selectedCategoryId === cat.id;
+                const catImageResolved = getCategoryImageUrl(cat.image);
+                const countInCat = safeDishes.filter(
+                  (d) => d.categoryId === cat.id || d.category?.id === cat.id
+                ).length;
+
+                return (
+                  <button
+                    key={cat.id}
+                    id={`filter-category-${cat.id}`}
+                    onClick={() => setSelectedCategoryId(cat.id)}
+                    className={`shrink-0 min-w-[160px] p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between gap-3 cursor-pointer group select-none ${
+                      isSelected
+                        ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 ring-2 ring-blue-500/40 -translate-y-0.5'
+                        : 'bg-slate-50/80 hover:bg-white text-slate-800 border-slate-200/80 hover:border-blue-200 hover:shadow-md hover:-translate-y-0.5'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-white text-slate-700 shadow-xs border border-slate-200/70 group-hover:text-blue-600 group-hover:border-blue-200'
+                        }`}
+                      >
+                        {catImageResolved ? (
+                          <img
+                            src={catImageResolved}
+                            alt={cat.name}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          getCategoryFallbackIcon(cat.name)
+                        )}
+                      </div>
+                      <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'bg-slate-200/80 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700'
+                        }`}
+                      >
+                        {countInCat}
+                      </span>
                     </div>
-                    <span
-                      className={`text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded-full ${
-                        isSelected
-                          ? 'bg-white/15 text-white'
-                          : 'bg-slate-200/80 text-slate-600 group-hover:bg-blue-100 group-hover:text-blue-700'
-                      }`}
-                    >
-                      {countInCat}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-display font-black text-[11px] sm:text-sm block tracking-tight leading-snug line-clamp-1">
-                      {cat.name}
-                    </span>
-                    <span
-                      className={`text-[9px] sm:text-[10px] font-medium block mt-0.5 ${
-                        isSelected ? 'text-slate-300' : 'text-slate-400'
-                      }`}
-                    >
-                      {countInCat > 1 ? `${countInCat} spécialités` : `${countInCat} spécialité`}
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+                    <div>
+                      <span className="font-display font-black text-sm block tracking-tight leading-snug line-clamp-1">
+                        {cat.name}
+                      </span>
+                      <span
+                        className={`text-[10px] font-medium block mt-0.5 ${
+                          isSelected ? 'text-slate-300' : 'text-slate-400'
+                        }`}
+                      >
+                        {countInCat > 1 ? `${countInCat} spécialités` : `${countInCat} spécialité`}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
@@ -531,22 +733,12 @@ export const HomePage: React.FC = () => {
 
         {/* Loading State */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {[1, 2, 3, 4, 5, 6, 7, 8].map((n) => (
-              <div
-                key={n}
-                className="bg-white rounded-3xl border border-slate-200/70 p-4 space-y-4 animate-pulse shadow-xs"
-              >
-                <div className="aspect-4/3 bg-slate-200 rounded-2xl" />
-                <div className="h-5 bg-slate-200 rounded-md w-3/4" />
-                <div className="h-3.5 bg-slate-100 rounded-md w-full" />
-                <div className="h-3.5 bg-slate-100 rounded-md w-2/3" />
-                <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                  <div className="h-6 bg-slate-200 rounded-md w-1/3" />
-                  <div className="h-9 bg-slate-200 rounded-xl w-1/3" />
-                </div>
-              </div>
-            ))}
+          <div className="py-6">
+            <NetflixLoader
+              variant="card"
+              size="md"
+              message="Loading"
+            />
           </div>
         ) : filteredDishes.length === 0 ? (
           /* Empty Search or Filter */

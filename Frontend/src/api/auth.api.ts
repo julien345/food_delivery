@@ -1,4 +1,4 @@
-import { apiClient, clearAuthHeader } from './client';
+import { apiClient } from './client';
 import { AuthResponse, User } from '../types';
 import { cleanPhoneNumber } from '../utils/phone.utils';
 import { normalizeUser } from './admin.api';
@@ -85,12 +85,6 @@ export const authApi = {
       }
       throw err;
     }
-  },
-
-  logout: async (): Promise<void> => {
-    // Logout is handled entirely on the frontend: clear local tokens/state and auth header.
-    clearAuthHeader();
-    return;
   },
 
   /**

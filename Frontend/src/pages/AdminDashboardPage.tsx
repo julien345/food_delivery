@@ -9,6 +9,7 @@ import { uploadApi, fileToDataUrl } from '../api/upload.api';
 import { statsApi } from '../api/stats.api';
 import { AdminAnalyticsView } from '../components/admin/AdminAnalyticsView';
 import { UserTable } from '../components/admin/UserTable';
+import { NetflixLoader } from '../components/common/NetflixLoader';
 import {
   Order,
   Dish,
@@ -69,6 +70,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [userLoading, setUserLoading] = useState(false);
   const [serverStats, setServerStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingStep, setLoadingStep] = useState<string>('Synchronisation des commandes, menus et statistiques...');
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
 
@@ -91,6 +93,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [dishIsAvailable, setDishIsAvailable] = useState(true);
   const [isUploadingDishImg, setIsUploadingDishImg] = useState(false);
   const [dishLocalError, setDishLocalError] = useState<string | null>(null);
+  const [dishLocalSuccess, setDishLocalSuccess] = useState<string | null>(null);
 
   // Dish Category & Search Filters in Admin
   const [dishCategoryFilter, setDishCategoryFilter] = useState<string>('ALL');
@@ -104,6 +107,7 @@ export const AdminDashboardPage: React.FC = () => {
   const [catImagePreview, setCatImagePreview] = useState('');
   const [isUploadingCatImg, setIsUploadingCatImg] = useState(false);
   const [categoryLocalError, setCategoryLocalError] = useState<string | null>(null);
+  const [categoryLocalSuccess, setCategoryLocalSuccess] = useState<string | null>(null);
 
   // User Modal
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -151,9 +155,17 @@ export const AdminDashboardPage: React.FC = () => {
     }
   };
 
-  const loadAllData = async () => {
+  const loadAllData = async (attempt = 0) => {
     setLoading(true);
     setFetchError(null);
+    const startTime = Date.now();
+
+    if (attempt > 0) {
+      setLoadingStep(`Le serveur prépare vos données... Nouvelle tentative (${attempt}/3)`);
+    } else {
+      setLoadingStep('Synchronisation des commandes, menus et statistiques...');
+    }
+
     try {
       const [ordersRes, dishesRes, catsRes, clientsRes, deliveryRes, adminsRes, statsRes] = await Promise.allSettled([
         orderApi.getAll({ limit: 100 }),
@@ -164,6 +176,27 @@ export const AdminDashboardPage: React.FC = () => {
         adminApi.getAdmins(),
         statsApi.getStats(),
       ]);
+
+      const ordersOk = ordersRes.status === 'fulfilled';
+      const dishesOk = dishesRes.status === 'fulfilled';
+      const catsOk = catsRes.status === 'fulfilled';
+
+      // Si les endpoints vitaux (commandes ou plats) n'ont pas encore répondu
+      // (ex: cold-start, latence réseau ou démarrage à froid du backend en production)
+      if ((!ordersOk || !dishesOk) && attempt < 2) {
+        console.warn(`Tentative ${attempt + 1}/3 incomplète (orders: ${ordersOk}, dishes: ${dishesOk}). Nouvelle tentative dans 1.5s...`);
+        setLoadingStep(`Connexion aux cuisines en cours... Synchronisation (${attempt + 1}/3)`);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        return loadAllData(attempt + 1);
+      }
+
+      // Si après 3 tentatives ni commandes ni plats n'ont pu être récupérés
+      if (!ordersOk && !dishesOk && !catsOk) {
+        setFetchError(
+          'Le serveur met du temps à répondre ou a rencontré une indisponibilité temporaire. Les données n\'ont pas pu être synchronisées.'
+        );
+        return;
+      }
 
       if (ordersRes.status === 'fulfilled') {
         const val = ordersRes.value;
@@ -216,10 +249,18 @@ export const AdminDashboardPage: React.FC = () => {
       if (statsRes.status === 'fulfilled' && statsRes.value) {
         setServerStats(statsRes.value);
       }
+      setFetchError(null);
     } catch (err: any) {
-      console.error('Erreur globale dashboard:', err);
+      console.warn('Erreur globale dashboard:', err);
       setFetchError(err.message || 'Impossible de charger les données du dashboard.');
     } finally {
+      // Garantit que le loader reste affiché assez de temps (au moins 800ms)
+      // pour laisser à React et au navigateur le temps de préparer l'interface
+      const elapsed = Date.now() - startTime;
+      const minDuration = 800;
+      if (elapsed < minDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
+      }
       setLoading(false);
     }
   };
@@ -267,12 +308,13 @@ export const AdminDashboardPage: React.FC = () => {
     if (!file) return;
     setIsUploadingDishImg(true);
     setDishLocalError(null);
+    setDishLocalSuccess(null);
     try {
       const res = await uploadApi.uploadImage(file);
       // Lit directement le champ image (et non uniquement imageUrl)
       const uploadedImg = res.image || res.url;
       setDishImageUrl(uploadedImg);
-      showNotification('success', 'Image uploadée avec succès !');
+      setDishLocalSuccess('Image uploadée avec succès !');
     } catch (err: any) {
       setDishLocalError(err.response?.data?.message || err.response?.data?.error || err.message || "Erreur lors de l'upload de l'image");
     } finally {
@@ -285,11 +327,12 @@ export const AdminDashboardPage: React.FC = () => {
     if (!file) return;
     setIsUploadingCatImg(true);
     setCategoryLocalError(null);
+    setCategoryLocalSuccess(null);
     try {
       const res = await uploadApi.uploadImage(file);
       const uploadedImg = res.image || res.url;
       setCategoryImageUrl(uploadedImg);
-      showNotification('success', 'Image uploadée avec succès !');
+      setCategoryLocalSuccess('Image uploadée avec succès !');
     } catch (err: any) {
       setCategoryLocalError(err.response?.data?.message || err.response?.data?.error || err.message || "Erreur lors de l'upload de l'image");
     } finally {
@@ -307,6 +350,7 @@ export const AdminDashboardPage: React.FC = () => {
     setDishCategoryId(categories[0]?.id || '');
     setDishIsAvailable(true);
     setDishLocalError(null);
+    setDishLocalSuccess(null);
     setDishModalOpen(true);
   };
 
@@ -320,6 +364,7 @@ export const AdminDashboardPage: React.FC = () => {
     setDishCategoryId(dish.categoryId);
     setDishIsAvailable(dish.isAvailable);
     setDishLocalError(null);
+    setDishLocalSuccess(null);
     setDishModalOpen(true);
   };
 
@@ -387,6 +432,7 @@ export const AdminDashboardPage: React.FC = () => {
     setCategoryName('');
     setCategoryImageUrl('');
     setCategoryLocalError(null);
+    setCategoryLocalSuccess(null);
     setCategoryModalOpen(true);
   };
 
@@ -395,6 +441,7 @@ export const AdminDashboardPage: React.FC = () => {
     setCategoryName(cat.name);
     setCategoryImageUrl(cat.image || (cat as any).imageUrl || '');
     setCategoryLocalError(null);
+    setCategoryLocalSuccess(null);
     setCategoryModalOpen(true);
   };
 
@@ -723,11 +770,39 @@ export const AdminDashboardPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Loading Skeleton */}
+      {/* Netflix-Style Admin Loader */}
       {loading && (
-        <div className="p-12 flex flex-col items-center justify-center bg-white rounded-3xl border border-slate-200 space-y-4">
-          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-          <p className="text-sm font-bold text-slate-600">Chargement des données du tableau de bord...</p>
+        <div className="py-6">
+          <NetflixLoader
+            variant="card"
+            size="lg"
+            message="Loading"
+          />
+        </div>
+      )}
+
+      {/* Error Banner when server could not return data */}
+      {fetchError && !loading && (
+        <div className="p-8 rounded-3xl bg-slate-950 border border-rose-500/30 text-center space-y-4 my-6 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="w-14 h-14 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 flex items-center justify-center mx-auto shadow-md">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h4 className="font-display text-lg font-bold text-white tracking-tight">
+            Impossible de synchroniser les données du serveur
+          </h4>
+          <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
+            {fetchError}
+          </p>
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+            <button
+              onClick={() => loadAllData(0)}
+              className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer active:scale-95"
+            >
+              <RefreshCw className="w-4 h-4" />
+              <span>Réessayer la synchronisation</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -1736,6 +1811,22 @@ export const AdminDashboardPage: React.FC = () => {
                 </label>
               </div>
 
+              {/* Message de succès isolé dans le formulaire d'ajout / modification de plat */}
+              {dishLocalSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs flex items-start gap-2.5 animate-in fade-in shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium leading-relaxed">{dishLocalSuccess}</div>
+                  <button
+                    type="button"
+                    onClick={() => setDishLocalSuccess(null)}
+                    className="text-emerald-500 hover:text-emerald-700 transition cursor-pointer p-0.5"
+                    title="Fermer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {/* Bandeau d'alerte rouge d'erreur isolé dans le formulaire */}
               {dishLocalError && (
                 <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in shadow-xs">
@@ -1878,6 +1969,22 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Message de succès isolé dans le formulaire de catégorie */}
+              {categoryLocalSuccess && (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-800 text-xs flex items-start gap-2.5 animate-in fade-in shadow-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-medium leading-relaxed">{categoryLocalSuccess}</div>
+                  <button
+                    type="button"
+                    onClick={() => setCategoryLocalSuccess(null)}
+                    className="text-emerald-500 hover:text-emerald-700 transition cursor-pointer p-0.5"
+                    title="Fermer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+
               {/* Bandeau d'alerte rouge d'erreur isolé dans le formulaire */}
               {categoryLocalError && (
                 <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-2xl text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in shadow-xs">
@@ -1993,24 +2100,21 @@ export const AdminDashboardPage: React.FC = () => {
                     required
                     value={newPhone}
                     onChange={(e) => setNewPhone(e.target.value)}
-                    placeholder="+237 690 00 00 00 ou 06..."
+                    placeholder="+237 690 00 00 00"
                     className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 font-mono"
                   />
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Nettoyé automatiquement en format strict E.164 (+237...). Les numéros locaux commençant par 0 (ex: 06...) sont automatiquement convertis.
-                  </p>
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Mot de passe (optionnel / selon votre API)
+                    Mot de passe
                   </label>
                   <div className="relative">
                     <input
                       type={showUserPassword ? 'text' : 'password'}
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder="Ex: MotDePasse123! (si exigé par votre serveur)"
+                      placeholder="Mot de passe"
                       className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 pr-10"
                     />
                     <button
@@ -2022,9 +2126,6 @@ export const AdminDashboardPage: React.FC = () => {
                       {showUserPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Si votre API requiert un mot de passe initial pour créer un compte, renseignez-le ici.
-                  </p>
                 </div>
 
                 <div>

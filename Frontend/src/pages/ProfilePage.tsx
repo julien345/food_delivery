@@ -75,13 +75,11 @@ export const ProfilePage: React.FC = () => {
                 <Phone className="w-3.5 h-3.5 text-slate-400" />
                 <span>{user?.phone ? user.phone : 'Numéro non renseigné'}</span>
               </p>
-              {user?.role !== 'CLIENT' && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    <Shield className="w-3 h-3" /> Rôle : {user?.role}
-                  </span>
-                </div>
-              )}
+              <div className="mt-2 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                  <Shield className="w-3 h-3" /> Rôle : {user?.role}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -153,13 +151,10 @@ export const ProfilePage: React.FC = () => {
                   type="tel"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+237 699 11 22 33 ou 06..."
+                  placeholder="+237 699 11 22 33"
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
                 />
               </div>
-              <p className="text-[11px] text-slate-400 mt-1">
-                Format attendu : indicatif international (+237...) ou format local commençant par 0 (ex: 06... converti automatiquement en +237...).
-              </p>
             </div>
 
             <div className="pt-3">

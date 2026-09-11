@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User, AuthResponse } from '../types';
 import { authApi, RegisterDto, LoginDto, UpdateProfileDto } from '../api/auth.api';
-import { clearAuthHeader } from '../api/client';
 import { useCartStore } from './cart.store';
 
 interface AuthState {
@@ -15,7 +14,7 @@ interface AuthState {
 
   login: (dto: LoginDto) => Promise<AuthResponse>;
   register: (dto: RegisterDto) => Promise<AuthResponse>;
-  logout: () => Promise<void>;
+  logout: () => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
   fetchMe: () => Promise<User | null>;
   fetchProfile: () => Promise<User | null>;
@@ -25,7 +24,7 @@ interface AuthState {
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
@@ -89,33 +88,12 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: async () => {
+      logout: () => {
         try {
           useCartStore.getState().resetLocalCart();
         } catch {
           // ignore
         }
-
-        try {
-          // cleanup client-side auth header and call authApi cleanup
-          clearAuthHeader();
-          await authApi.logout();
-        } catch {
-          // le frontend doit toujours se nettoyer même si le backend répond mal
-        }
-
-        try {
-          useAuthStore.persist?.clearStorage();
-        } catch {
-          // ignore
-        }
-
-        try {
-          localStorage.removeItem('auth-storage');
-        } catch {
-          // ignore
-        }
-
         set({
           user: null,
           accessToken: null,
@@ -129,17 +107,16 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           accessToken,
           refreshToken,
-          isAuthenticated: !!state.user && !!accessToken,
+          isAuthenticated: !!state.user || true,
         }));
       },
 
       fetchMe: async () => {
         try {
           const user = await authApi.getProfile();
-          set({ user, isAuthenticated: !!user });
+          set({ user });
           return user;
         } catch {
-          set({ user: null, isAuthenticated: false });
           return null;
         }
       },
@@ -147,10 +124,9 @@ export const useAuthStore = create<AuthState>()(
       fetchProfile: async () => {
         try {
           const user = await authApi.getProfile();
-          set({ user, isAuthenticated: !!user });
+          set({ user });
           return user;
         } catch {
-          set({ user: null, isAuthenticated: false });
           return null;
         }
       },
@@ -159,7 +135,7 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true, error: null });
         try {
           const updated = await authApi.updateMe(dto);
-          set({ user: updated, isLoading: false, isAuthenticated: !!updated });
+          set({ user: updated, isLoading: false });
           return updated;
         } catch (err: any) {
           const message =

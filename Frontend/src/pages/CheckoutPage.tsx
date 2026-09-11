@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '../store/auth.store';
@@ -29,6 +29,18 @@ export const CheckoutPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  const triggerError = (msg: string) => {
+    setErrorMsg(msg);
+    setTimeout(() => {
+      if (errorRef.current) {
+        errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 50);
+  };
 
   // Quick inline new address form
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
@@ -61,10 +73,14 @@ export const CheckoutPage: React.FC = () => {
 
   const handleSaveInlineAddress = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newStreet.trim()) {
+      triggerError('Veuillez préciser votre rue ou quartier à Douala.');
+      return;
+    }
     try {
       const created = await addressApi.create({
         label: newLabel,
-        street: newStreet,
+        street: newStreet.trim(),
         city: newCity,
         isDefault: addresses.length === 0,
       });
@@ -72,8 +88,9 @@ export const CheckoutPage: React.FC = () => {
       setSelectedAddressId(created.id);
       setShowNewAddressForm(false);
       setNewStreet('');
+      setErrorMsg(null);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Erreur enregistrement adresse');
+      triggerError(err.response?.data?.error || 'Erreur enregistrement adresse');
     }
   };
 
@@ -94,21 +111,21 @@ export const CheckoutPage: React.FC = () => {
           targetAddressId = created.id;
           setShowNewAddressForm(false);
         } catch (aErr: any) {
-          setErrorMsg(aErr.response?.data?.error || "Veuillez renseigner votre adresse de livraison.");
+          triggerError(aErr.response?.data?.error || "Veuillez renseigner votre adresse de livraison.");
           return;
         }
       } else if (addresses.length > 0) {
         targetAddressId = addresses[0].id;
         setSelectedAddressId(targetAddressId);
       } else {
-        setErrorMsg('Veuillez renseigner votre adresse de livraison (rue/quartier) à Douala ci-dessus.');
+        triggerError('Veuillez renseigner votre adresse de livraison (rue/quartier) à Douala ci-dessus.');
         setShowNewAddressForm(true);
         return;
       }
     }
 
     if (items.length === 0) {
-      setErrorMsg('Votre panier est vide.');
+      triggerError('Votre panier est vide.');
       return;
     }
 
@@ -159,7 +176,7 @@ export const CheckoutPage: React.FC = () => {
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setErrorMsg(
+      triggerError(
         err.response?.data?.error ||
         err.message ||
         'Impossible de finaliser la commande. Veuillez vérifier vos articles et votre adresse.'
@@ -209,9 +226,17 @@ export const CheckoutPage: React.FC = () => {
       </div>
 
       {errorMsg && (
-        <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
-          <span className="font-medium">{errorMsg}</span>
+        <div
+          ref={errorRef}
+          id="checkout-error-banner"
+          tabIndex={-1}
+          className="mb-6 p-4.5 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-800 text-xs sm:text-sm flex items-start gap-3 shadow-md shadow-rose-600/10 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold block text-rose-900">Une attention est requise :</span>
+            <span className="font-medium text-rose-700">{errorMsg}</span>
+          </div>
         </div>
       )}
 
@@ -386,7 +411,7 @@ export const CheckoutPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-950">
-                    Stripe Checkout (Cartes & Mobile Money)
+                    Carte
                   </h4>
                   <p className="text-xs text-slate-500">
                     Visa, Mastercard, cartes internationales et paiements sécurisés
@@ -449,6 +474,19 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
+            {/* In-place Error Notification */}
+            {errorMsg && (
+              <div
+                onClick={() => {
+                  errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 cursor-pointer hover:bg-rose-100/80 transition"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span className="line-clamp-2">{errorMsg}</span>
+              </div>
+            )}
+
             {/* Submit Action */}
             <button
               id="confirm-order-btn"
@@ -469,11 +507,6 @@ export const CheckoutPage: React.FC = () => {
                 </>
               )}
             </button>
-
-            <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <span>Livraison estimée en 30 à 45 minutes à Douala</span>
-            </div>
           </div>
         </div>
       </div>

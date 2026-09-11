@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
-import { XCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { XCircle, Check } from 'lucide-react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { orderApi } from '../api/order.api';
 import { Order } from '../types';
 import { StatusTimeline } from '../components/common/StatusTimeline';
-import { CancelOrderModal } from '../components/modals/CancelOrderModal';
 import { paymentApi } from '../api/payment.api';
 import { formatFCFA, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from '../utils/format';
+import { CancelOrderModal } from '../components/common/CancelOrderModal';
+import { NetflixLoader } from '../components/common/NetflixLoader';
 import {
   Clock,
   MapPin,
@@ -21,7 +22,7 @@ import {
   ChefHat,
 } from 'lucide-react';
 
-export const OrderDetailPage = () => {
+export const OrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const paymentStatus = searchParams.get('payment');
@@ -32,7 +33,6 @@ export const OrderDetailPage = () => {
   const [isPolling, setIsPolling] = useState(false);
   const [paymentConfirmedNotice, setPaymentConfirmedNotice] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
 const handlePayNow = async () => {
   if (!order) return;
@@ -42,29 +42,34 @@ const handlePayNow = async () => {
     const { paymentUrl } = await paymentApi.initiate({ orderId: order.id, method: 'STRIPE' });
     window.location.href = paymentUrl;
   } catch (err: any) {
-    setErrorMsg(err.response?.data?.error || 'Impossible de lancer le paiement.');
+    const errorText = err.response?.data?.error || 'Impossible de lancer le paiement.';
+    setErrorMsg(errorText);
     setIsPaying(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 };
 
-const [isCancelling, setIsCancelling] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
-const handleCancelOrder = async () => {
-  if (!order) return;
-  
-  setIsCancelling(true);
-  setErrorMsg(null);
-  try {
-    await orderApi.updateStatus(order.id, 'CANCELLED');
-    setOrder(prev => prev ? { ...prev, status: 'CANCELLED' } : null);
-    setIsCancelModalOpen(false); // Ferme le modal après succès
-  } catch (err: any) {
-    setErrorMsg(err.response?.data?.error || 'Impossible d\'annuler la commande.');
-  } finally {
-    setIsCancelling(false);
-  }
-};
-
+  const confirmCancelOrder = async () => {
+    if (!order) return;
+    setIsCancelling(true);
+    setErrorMsg(null);
+    try {
+      // Appel PATCH /orders/:id/status
+      await orderApi.updateStatus(order.id, 'CANCELLED');
+      setOrder(prev => prev ? { ...prev, status: 'CANCELLED' } : null);
+      setShowCancelModal(false);
+      setSuccessNotice('Votre commande a été annulée avec succès.');
+      setTimeout(() => setSuccessNotice(null), 6000);
+    } catch (err: any) {
+      setErrorMsg(err.response?.data?.error || err.response?.data?.message || "Impossible d'annuler la commande.");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
 
   const pollCountRef = useRef(0);
@@ -128,11 +133,12 @@ const handleCancelOrder = async () => {
 
   if (loading && !order) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
-        <div className="w-12 h-12 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs text-slate-500 font-medium">
-          Chargement des détails de votre commande...
-        </p>
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <NetflixLoader
+          variant="card"
+          size="md"
+          message="Loading"
+        />
       </div>
     );
   }
@@ -175,12 +181,20 @@ const handleCancelOrder = async () => {
 
         <button
           onClick={() => fetchOrder()}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isPolling ? 'animate-spin text-blue-600' : ''}`} />
           <span>Actualiser le statut</span>
         </button>
       </div>
+
+      {/* Success Notification Banner */}
+      {successNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center gap-2 shadow-xs animate-in fade-in">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span>{successNotice}</span>
+        </div>
+      )}
 
       {/* Payment Confirmation Banner */}
       {paymentConfirmedNotice && (
@@ -426,12 +440,8 @@ const handleCancelOrder = async () => {
     )}
   </div>
 
-  {/* On affiche le bloc d'actions tant que la commande est en attente (PENDING) */}
-{order.status === 'PENDING' && (
-  <div className="pt-2 flex flex-col sm:flex-row gap-2">
-    
-    {/* On n'affiche le bouton Payer que si le paiement n'est pas encore validé */}
-    {order.payment?.status !== 'SUCCESS' && (
+  {order.status === 'PENDING' && order.payment?.status !== 'SUCCESS' && (
+    <div className="pt-2 flex flex-col sm:flex-row gap-2">
       <button
         onClick={handlePayNow}
         disabled={isPaying || isCancelling}
@@ -442,33 +452,35 @@ const handleCancelOrder = async () => {
         <CreditCard className="w-3.5 h-3.5" />
         <span>{isPaying ? 'Redirection vers Stripe...' : 'Payer maintenant'}</span>
       </button>
-    )}
 
-    {/* Le bouton Annuler reste disponible tant que le statut est PENDING */}
-   <button
-    onClick={() => setIsCancelModalOpen(true)} // 👈 Ouvre le magnifique modal
-      disabled={isPaying || isCancelling}
-      className={`px-3 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
-                              isCancelling
-                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-2xs'
-                            }`}
->
-  <XCircle className="w-3.5 h-3.5" />
-  <span>Annuler</span>
-</button>
-  </div>
-)}
-
+      <button
+        onClick={() => setShowCancelModal(true)}
+        disabled={isPaying || isCancelling}
+        className={`py-2.5 px-3.5 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 transition-all border shadow-xs cursor-pointer ${
+          isCancelling
+            ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+            : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 hover:border-rose-300'
+        }`}
+      >
+        <XCircle className="w-3.5 h-3.5" />
+        <span>{isCancelling ? 'Annulation...' : 'Annuler'}</span>
+      </button>
+    </div>
+  )}
 </div>
         </div>
       </div>
-     <CancelOrderModal
-        isOpen={isCancelModalOpen}
-        onClose={() => setIsCancelModalOpen(false)}
-        onConfirm={handleCancelOrder}
+
+      {/* Confirmation modal for cancellation */}
+      <CancelOrderModal
+        isOpen={showCancelModal}
+        orderNumber={order?.orderNumber}
         isCancelling={isCancelling}
-      /> 
+        onConfirm={confirmCancelOrder}
+        onClose={() => {
+          if (!isCancelling) setShowCancelModal(false);
+        }}
+      />
     </div>
   );
 };

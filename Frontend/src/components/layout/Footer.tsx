@@ -1,5 +1,5 @@
 import React from 'react';
-import { UtensilsCrossed, Phone, MapPin, Clock, ShieldCheck, Truck, LayoutDashboard } from 'lucide-react';
+import { Phone, MapPin, Clock, Truck, LayoutDashboard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/auth.store';
 
@@ -10,37 +10,11 @@ export const Footer: React.FC = () => {
   const isClient = !isAuthenticated || user?.role === 'CLIENT';
 
   return (
-    <footer className="bg-slate-950 text-slate-400 pt-14 pb-10 border-t border-slate-900">
+    <footer className="bg-slate-950 text-slate-400 pt-12 pb-10 border-t border-slate-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 mb-12">
-          {/* Brand Column */}
-          <div className="md:col-span-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-900/30">
-                <UtensilsCrossed className="w-5 h-5 text-white" />
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-display text-2xl font-black tracking-tight text-white block leading-none">
-                  Julien's
-                </span>
-                <span className="text-[11px] font-black tracking-wider px-1.5 py-0.5 rounded-md bg-blue-600 text-white uppercase leading-none shadow-xs">
-                  Food
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed max-w-sm">
-              L'excellence de la gastronomie et des grillades savoureuses préparées avec des ingrédients frais du terroir et livrées avec soin à Douala.
-            </p>
-
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 font-medium">
-              <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>Qualité artisanale & hygiène garantie</span>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 lg:gap-12 mb-10">
           {/* Quick Navigation */}
-          <div className="md:col-span-2 space-y-3">
+          <div className="space-y-3">
             <h4 className="text-xs font-black text-white uppercase tracking-wider">
               Navigation
             </h4>
@@ -91,7 +65,7 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Hours & Service */}
-          <div className="md:col-span-3 space-y-3">
+          <div className="space-y-3">
             <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-amber-400" />
               <span>Horaires du service</span>
@@ -105,28 +79,22 @@ export const Footer: React.FC = () => {
                 <span>Vendredi - Samedi</span>
                 <span className="text-white font-bold">11h00 - 00h00</span>
               </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-900">
+              <div className="flex items-center justify-between py-1">
                 <span>Dimanche</span>
                 <span className="text-white font-bold">12h00 - 23h00</span>
-              </div>
-              <div className="pt-1.5">
-                <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-400">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  Service de livraison actif
-                </span>
               </div>
             </div>
           </div>
 
           {/* Contact & Location */}
-          <div className="md:col-span-3 space-y-3">
+          <div className="space-y-3">
             <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
               <Phone className="w-3.5 h-3.5 text-blue-400" />
               <span>Contact direct</span>
             </h4>
             <div className="space-y-3">
               <p className="text-xs text-slate-400 leading-relaxed">
-                Besoin d'un renseignement ou d'un service traiteur sur-mesure ?
+                Besoin d'un renseignement contactez nous
               </p>
               <a
                 href="tel:+237699112233"

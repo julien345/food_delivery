@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { orderApi } from '../api/order.api';
 import { paymentApi } from '../api/payment.api';
 import { Order, PaginationMeta, OrderStatus } from '../types';
-import { CancelOrderModal } from '../components/modals/CancelOrderModal';
 import { formatFCFA, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from '../utils/format';
+import { CancelOrderModal } from '../components/common/CancelOrderModal';
+import { NetflixLoader } from '../components/common/NetflixLoader';
 import {
   ShoppingBag,
   ArrowRight,
@@ -21,6 +22,8 @@ import {
   ChefHat,
   ChevronDown,
   UtensilsCrossed,
+  Check,
+  X,
 } from 'lucide-react';
 
 type FilterTab = 'ALL' | 'ACTIVE' | 'DELIVERED' | 'CANCELLED';
@@ -45,14 +48,16 @@ export const OrdersPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+
   useEffect(() => {
     loadOrders(1);
   }, []);
 
-  const loadOrders = async (targetPage = 1) => {
+  const loadOrders = async (targetPage = 1, attempt = 0) => {
     setLoading(true);
+    const startTime = Date.now();
     try {
       const response = await orderApi.getMyOrders({ page: targetPage, limit: 8 });
       const ordersList = Array.isArray(response?.data) ? response.data : [];
@@ -70,8 +75,17 @@ export const OrdersPage: React.FC = () => {
       }
     } catch (err) {
       console.error('Erreur lors du chargement des commandes:', err);
+      if (attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+        return loadOrders(targetPage, attempt + 1);
+      }
       setOrders([]);
     } finally {
+      const elapsed = Date.now() - startTime;
+      const minDuration = 700;
+      if (elapsed < minDuration) {
+        await new Promise((resolve) => setTimeout(resolve, minDuration - elapsed));
+      }
       setLoading(false);
     }
   };
@@ -89,34 +103,43 @@ export const OrdersPage: React.FC = () => {
     try {
       const { paymentUrl } = await paymentApi.initiate({ orderId, method: 'STRIPE' });
       window.location.href = paymentUrl;
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erreur lors du lancement du paiement:', err);
+      setActionNotice(err.response?.data?.error || "Impossible d'initialiser le paiement pour cette commande.");
       setPayingOrderId(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const handleCancelOrder = async () => {
-  // On s'assure qu'une commande a bien été sélectionnée
-  if (!selectedOrderId) return;
-
-  setCancellingOrderId(selectedOrderId);
-  try {
-    // 1. Appel de l'API avec le paramètre 'status' corrigé
-    const updated = await orderApi.updateStatus(selectedOrderId, 'CANCELLED');
-    
-    // 2. Mise à jour de la liste locale
-    setOrders((prev) => prev.map((o) => (o.id === selectedOrderId ? updated : o)));
-    
-    // 3. Fermeture automatique du modal après succès
-    setIsCancelModalOpen(false);
-    setSelectedOrderId(null);
-  } catch (err) {
-    console.error('Erreur lors de l\'annulation de la commande:', err);
-  } finally {
-    setCancellingOrderId(null);
-  }
-};
-
+  const confirmCancelOrder = async () => {
+    if (!orderToCancel) return;
+    const orderId = orderToCancel.id;
+    setCancellingOrderId(orderId);
+    try {
+      const updated = await orderApi.updateStatus(orderId, 'CANCELLED');
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId
+            ? {
+                ...o,
+                status: 'CANCELLED',
+                ...(typeof updated === 'object' && updated?.id ? updated : {}),
+              }
+            : o
+        )
+      );
+      setActionNotice(`La commande #${orderToCancel.orderNumber} a été annulée avec succès.`);
+      setOrderToCancel(null);
+      setTimeout(() => setActionNotice(null), 5000);
+    } catch (err: any) {
+      console.error("Erreur lors de l'annulation de la commande:", err);
+      const msg = err.response?.data?.error || err.response?.data?.message || "Impossible d'annuler la commande.";
+      setActionNotice(`Erreur : ${msg}`);
+      setTimeout(() => setActionNotice(null), 5000);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
 
   const safeOrders = Array.isArray(orders) ? orders : [];
 
@@ -184,6 +207,22 @@ export const OrdersPage: React.FC = () => {
           </Link>
         </div>
       </div>
+
+      {/* Action Notification Banner */}
+      {actionNotice && (
+        <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold flex items-center justify-between gap-3 shadow-xs animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>{actionNotice}</span>
+          </div>
+          <button
+            onClick={() => setActionNotice(null)}
+            className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       {!loading && safeOrders.length > 0 && (
@@ -265,12 +304,14 @@ export const OrdersPage: React.FC = () => {
         </div>
       )}
 
-      {/* Loading Skeleton */}
+      {/* Loading State */}
       {loading ? (
-        <div className="space-y-4">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="bg-white p-6 rounded-2xl border border-slate-200/80 animate-pulse h-36" />
-          ))}
+        <div className="py-6">
+          <NetflixLoader
+            variant="card"
+            size="md"
+            message="Loading"
+          />
         </div>
       ) : safeOrders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
@@ -447,23 +488,20 @@ export const OrdersPage: React.FC = () => {
                             <CreditCard className="w-3.5 h-3.5" />
                             <span>{isPaying ? 'Redirection...' : 'Payer maintenant'}</span>
                           </button>
+
                           <button
-                              onClick={() => {
-                                setSelectedOrderId(order.id); // Stocke l'ID de la commande à annuler
-                                setIsCancelModalOpen(true);    // Ouvre le magnifique modal
-                              }}
-                              disabled={isPaying || cancellingOrderId === order.id}
-                              className={`px-3 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
-                                cancellingOrderId === order.id
-                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                  : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-2xs'
-                              }`}
-                              title="Annuler cette commande"
-                            >
-                              <XCircle className="w-3.5 h-3.5" />
-                              <span>{cancellingOrderId === order.id ? 'Annulation...' : 'Annuler'}</span>
-                        </button>
-                          
+                            onClick={() => setOrderToCancel(order)}
+                            disabled={isPaying || isCancelling}
+                            className={`px-3 py-2 text-xs font-bold rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                              isCancelling
+                                ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+                                : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-50 shadow-2xs'
+                            }`}
+                            title="Annuler cette commande"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span>{isCancelling ? 'Annulation...' : 'Annuler'}</span>
+                          </button>
                         </>
                       )}
 
@@ -555,14 +593,18 @@ export const OrdersPage: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* Confirmation modal for cancellation without relying on window.confirm */}
       <CancelOrderModal
-        isOpen={isCancelModalOpen}
+        isOpen={!!orderToCancel}
+        orderNumber={orderToCancel?.orderNumber}
+        isCancelling={cancellingOrderId === orderToCancel?.id}
+        onConfirm={confirmCancelOrder}
         onClose={() => {
-          setIsCancelModalOpen(false);
-          setSelectedOrderId(null);
+          if (!cancellingOrderId) {
+            setOrderToCancel(null);
+          }
         }}
-        onConfirm={handleCancelOrder} // Lance la nouvelle fonction sans window.confirm
-        isCancelling={cancellingOrderId !== null}
       />
     </div>
   );

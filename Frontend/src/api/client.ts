@@ -1,32 +1,57 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/auth.store';
 
-export const API_BASE_URL =
-  import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
+export const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    const custom =
+      localStorage.getItem('julien_api_url') ||
+      localStorage.getItem('custom_api_url');
+    if (custom && custom.trim()) {
+      return custom.trim().replace(/\/+$/, '');
+    }
+  }
+
+  const envUrl =
+    import.meta.env.VITE_API_URL ||
+    import.meta.env.VITE_API_BASE_URL ||
   'https://juliens-food-api.onrender.com';
 
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim().replace(/\/+$/, '');
+  }
+
+  return 'https://juliens-food-api.onrender.com';
+};
+
+export const setCustomApiUrl = (url: string): void => {
+  if (typeof window !== 'undefined') {
+    const cleaned = (url || '').trim().replace(/\/+$/, '');
+    if (cleaned) {
+      localStorage.setItem('julien_api_url', cleaned);
+    } else {
+      localStorage.removeItem('julien_api_url');
+      localStorage.removeItem('custom_api_url');
+    }
+    apiClient.defaults.baseURL = getApiBaseUrl();
+  }
+};
+
+export const API_BASE_URL = getApiBaseUrl();
+
 export const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || undefined,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 10000,
+  timeout: 30000,
 });
 
-export function clearAuthHeader() {
-  try {
-    // suppression de l'en-tête par défaut si présent
-    if (apiClient.defaults.headers && apiClient.defaults.headers.common) {
-      delete apiClient.defaults.headers.common.Authorization;
-    }
-  } catch {
-    // ignore
-  }
-}
-
-// Attache automatiquement le token à chaque requête
+// Attache automatiquement le token et la baseURL dynamique à chaque requête
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const currentBase = getApiBaseUrl();
+  if (currentBase) {
+    config.baseURL = currentBase;
+  }
   try {
     const token = useAuthStore.getState().accessToken;
     if (token && config.headers) {
@@ -122,26 +147,49 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshErr) {
         processQueue(refreshErr, null);
-        try {
-          const wasLoggedIn =
-            !!useAuthStore.getState().accessToken ||
-            !!useAuthStore.getState().refreshToken;
-          useAuthStore.getState().logout();
-          if (
-            wasLoggedIn &&
-            typeof window !== 'undefined' &&
-            !window.location.pathname.startsWith('/login')
-          ) {
+        // Déconnexion et nettoyage propre des anciens jetons expirés
+        useAuthStore.getState().logout();
+
+        // Ne redirige brutalement vers /login que si l'utilisateur se trouve sur une page protégée
+        if (typeof window !== 'undefined') {
+          const path = window.location.pathname;
+          const isProtectedRoute =
+            path.startsWith('/admin') ||
+            path.startsWith('/orders') ||
+            path.startsWith('/checkout') ||
+            path.startsWith('/profile') ||
+            path.startsWith('/delivery') ||
+            path.startsWith('/addresses');
+
+          if (isProtectedRoute && !path.startsWith('/login')) {
             window.location.href = `/login?redirect=${encodeURIComponent(
-              window.location.pathname
+              path
             )}&reason=order_auth_required`;
           }
-        } catch {
-          // ignore
         }
         return Promise.reject(refreshErr);
       } finally {
         isRefreshing = false;
+      }
+    }
+
+    // Retentative automatique sur les requêtes GET idempotentes en cas de coupure réseau,
+    // démarrage à froid (cold start) ou erreurs 502/503/504 du serveur
+    if (
+      originalRequest &&
+      originalRequest.method?.toLowerCase() === 'get' &&
+      (!originalRequest._networkRetryCount || originalRequest._networkRetryCount < 2)
+    ) {
+      const isNetworkOrColdStart =
+        !error.response ||
+        error.code === 'ECONNABORTED' ||
+        (error.response.status >= 502 && error.response.status <= 504);
+
+      if (isNetworkOrColdStart) {
+        originalRequest._networkRetryCount = (originalRequest._networkRetryCount || 0) + 1;
+        const delay = 1200 * originalRequest._networkRetryCount;
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return apiClient(originalRequest);
       }
     }
 
