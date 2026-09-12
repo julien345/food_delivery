@@ -7,6 +7,5 @@ export const ENV = {
   JWT_REFRESH_SECRET: process.env.JWT_REFRESH_SECRET,
   PORT: process.env.PORT || 3000,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
-  FRONTEND_URL: process.env.FRONTEND_URL,
-  CORS_ORIGINS: process.env.CORS_ORIGINS || '',
+  FRONTEND_URL: process.env.FRONTEND_URL || ''
 };

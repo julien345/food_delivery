@@ -20,7 +20,7 @@ import paymentController from "./modules/payment/payment.controller";
 const app = express();
 
 app.use(cors({
-  origin: ENV.CORS_ORIGINS.split(','),
+  origin: ENV.FRONTEND_URL.split(','),
 
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
