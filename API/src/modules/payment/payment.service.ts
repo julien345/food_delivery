@@ -24,22 +24,31 @@ class PaymentService {
 
     const provider = getPaymentProvider(method);
 
+    // Construction de la liste des items pour le prestataire (Stripe, MoMo, etc.)
+    const itemsForProvider = order.items.map((item) => ({
+      name: item.dish.name,
+      unitPrice: Number(item.unitPrice), // Cast Decimal en number pour la compatibilité
+      quantity: item.quantity,
+    }));
+
+    // ➡️ INJECTION EXPLICITE DES FRAIS DE LIVRAISON DE LA COMMANDE
+    itemsForProvider.push({
+      name: "Frais de livraison",
+      unitPrice: Number(order.deliveryFee), // Récupère les 1000 FCFA définis dans le modèle Order
+      quantity: 1,
+    });
+
     const { paymentUrl, providerReference } = await provider.initiatePayment({
       orderId,
       currency: "xaf",
-      items: order.items.map((item) => ({
-        name: item.dish.name,
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-      })),
+      items: itemsForProvider,
     });
 
     if (existingPayment) {
-      // Correction : on met à jour transactionId ET status ensemble,
-      // sinon le webhook cherchera l'ancienne référence Stripe abandonnée.
       await paymentRepository.updateStatus(existingPayment.id, providerReference, "PENDING");
     } else {
-      await paymentRepository.create(orderId, order.totalAmount, method, providerReference);
+      // order.totalAmount contient déjà sous-total + deliveryFee grâce au repository orders
+      await paymentRepository.create(orderId, Number(order.totalAmount), method, providerReference);
     }
 
     return { paymentUrl };
@@ -57,9 +66,7 @@ class PaymentService {
 
     const transactionId: string = payment.transactionId;
 
-    // Transaction : le paiement ET la commande avancent ensemble, ou aucun des deux ne change.
     await prisma.$transaction(async (tx) => {
-      
       await paymentRepository.updateStatus(payment.id, transactionId, result.status, tx);
 
       if (result.status === "SUCCESS") {
