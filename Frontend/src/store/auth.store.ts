@@ -94,11 +94,18 @@ export const useAuthStore = create<AuthState>()(
         } catch {
           // ignore
         }
+        try {
+          localStorage.removeItem('auth-storage');
+          sessionStorage.clear();
+        } catch {
+          // ignore
+        }
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
           isAuthenticated: false,
+          isLoading: false,
           error: null,
         });
       },

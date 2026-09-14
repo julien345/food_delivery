@@ -19,7 +19,18 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (!isAuthenticated || !user) {
     const isCheckout = location.pathname === '/checkout';
     const reasonParam = isCheckout ? '&reason=order_auth_required' : '';
-    return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}${reasonParam}`} replace />;
+    // Ne jamais propager une route réservée (admin ou livreur) en paramètre de redirection
+    // pour éviter qu'une connexion client ultérieure ne soit renvoyée vers cette route protégée
+    const isRestrictedPath =
+      location.pathname.startsWith('/admin') ||
+      location.pathname.startsWith('/delivery') ||
+      (allowedRoles && !allowedRoles.includes('CLIENT'));
+
+    const redirectQuery = isRestrictedPath
+      ? ''
+      : `?redirect=${encodeURIComponent(location.pathname)}${reasonParam}`;
+
+    return <Navigate to={`/login${redirectQuery}`} replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

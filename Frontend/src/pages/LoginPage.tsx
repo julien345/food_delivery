@@ -28,10 +28,22 @@ export const LoginPage: React.FC = () => {
   const reason = searchParams.get('reason');
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'ADMIN') {
-      navigate('/admin', { replace: true });
+    if (isAuthenticated && user) {
+      if (user.role === 'ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'DELIVERY_AGENT') {
+        navigate('/delivery', { replace: true });
+      } else {
+        const isRestrictedTarget =
+          !redirect ||
+          redirect.startsWith('/admin') ||
+          redirect.startsWith('/delivery') ||
+          redirect.startsWith('/login') ||
+          redirect.startsWith('/register');
+        navigate(isRestrictedTarget ? '/' : redirect, { replace: true });
+      }
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, redirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +55,14 @@ export const LoginPage: React.FC = () => {
       } else if (res.user?.role === 'DELIVERY_AGENT') {
         navigate('/delivery', { replace: true });
       } else {
-        navigate(redirect, { replace: true });
+        // CLIENT : Ne jamais rediriger un compte client vers une route admin ou livreur
+        const isRestrictedTarget =
+          !redirect ||
+          redirect.startsWith('/admin') ||
+          redirect.startsWith('/delivery') ||
+          redirect.startsWith('/login') ||
+          redirect.startsWith('/register');
+        navigate(isRestrictedTarget ? '/' : redirect, { replace: true });
       }
     } catch (err: any) {
       setLocalError(

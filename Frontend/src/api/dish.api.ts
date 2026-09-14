@@ -90,17 +90,7 @@ export const dishApi = {
       payload.imageUrl = imageVal;
     }
 
-    let res;
-    try {
-      res = await apiClient.post<any>('/dishes', payload);
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        res = await apiClient.post<any>('/api/dishes', payload);
-      } else {
-        throw err;
-      }
-    }
-
+    const res = await apiClient.post<any>('/dishes', payload);
     const raw = res.data?.data || res.data;
     const returnedImg = raw?.image || raw?.imageUrl || imageVal;
     return {
@@ -125,17 +115,7 @@ export const dishApi = {
       payload.imageUrl = imageVal;
     }
 
-    let res;
-    try {
-      res = await apiClient.put<any>(`/dishes/${id}`, payload);
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        res = await apiClient.put<any>(`/api/dishes/${id}`, payload);
-      } else {
-        throw err;
-      }
-    }
-
+    const res = await apiClient.put<any>(`/dishes/${id}`, payload);
     const raw = res.data?.data || res.data;
     const returnedImg = raw?.image || raw?.imageUrl || imageVal;
     return {
@@ -146,15 +126,7 @@ export const dishApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    try {
-      await apiClient.delete(`/dishes/${id}`);
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        await apiClient.delete(`/api/dishes/${id}`);
-      } else {
-        throw err;
-      }
-    }
+    await apiClient.delete(`/dishes/${id}`);
   },
 
   /**

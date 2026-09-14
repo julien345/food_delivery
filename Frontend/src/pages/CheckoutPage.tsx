@@ -7,6 +7,7 @@ import { orderApi } from '../api/order.api';
 import { paymentApi } from '../api/payment.api';
 import { Address } from '../types';
 import { formatFCFA } from '../utils/format';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   MapPin,
   ShoppingBag,
@@ -17,7 +18,10 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Truck,
 } from 'lucide-react';
+
+const DELIVERY_FEE = 1000;
 
 export const CheckoutPage: React.FC = () => {
   const { items, total, fetchCart, clearCart } = useCartStore();
@@ -28,6 +32,7 @@ export const CheckoutPage: React.FC = () => {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
 
@@ -149,33 +154,32 @@ export const CheckoutPage: React.FC = () => {
           method: 'STRIPE',
         });
 
-        // 3. Validate payment URL and redirect to Stripe
+        // 3. Redirection directe vers la passerelle de paiement
+        const paymentUrl = paymentResponse?.paymentUrl;
         if (
-          paymentResponse?.paymentUrl &&
-          (paymentResponse.paymentUrl.startsWith('http://') ||
-            paymentResponse.paymentUrl.startsWith('https://'))
+          paymentUrl &&
+          (paymentUrl.startsWith('http://') || paymentUrl.startsWith('https://'))
         ) {
-          clearCart();
-          window.location.href = paymentResponse.paymentUrl;
+          setIsRedirecting(true);
+          // Le vidage du panier s'effectue en arrière-plan sans perturber le parcours client
+          clearCart().catch(() => {});
+          window.location.replace(paymentUrl);
           return;
         }
 
-        // If returned URL is relative or direct confirmation
-        clearCart();
-        navigate(`/orders/${newOrder.id}?payment=success`);
+        // Si confirmation directe ou retour d'URL interne
+        setIsRedirecting(true);
+        clearCart().catch(() => {});
+        navigate(`/orders/${newOrder.id}?payment=success`, { replace: true });
       } catch (pErr: any) {
         console.error('Erreur module paiement:', pErr);
-        // La commande est créée, diriger vers le suivi avec explication
-        clearCart();
-        const pErrMsg =
-          pErr.response?.data?.error ||
-          pErr.message ||
-          "Le module de paiement n'a pas pu être initialisé. Vous pouvez régler à la livraison ou réessayer.";
-        setErrorMsg(pErrMsg);
-        navigate(`/orders/${newOrder.id}`);
+        setIsRedirecting(true);
+        clearCart().catch(() => {});
+        navigate(`/orders/${newOrder.id}`, { replace: true });
       }
     } catch (err: any) {
       setIsSubmitting(false);
+      setIsRedirecting(false);
       triggerError(
         err.response?.data?.error ||
         err.message ||
@@ -184,10 +188,34 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  
-  const finalTotal = total;
+  const finalTotal = total + (items.length > 0 ? DELIVERY_FEE : 0);
 
-  if (items.length === 0 && !loading) {
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex items-center justify-center">
+        <LogoLoader size="md" />
+      </div>
+    );
+  }
+
+  // Écran de transition vers le paiement sécurisé (ne montre jamais le panier vide)
+  if (isSubmitting || isRedirecting) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center space-y-6">
+        <LogoLoader size="md" />
+        <div className="space-y-2">
+          <h2 className="font-display text-xl sm:text-2xl font-black text-slate-950">
+            Redirection vers le paiement sécurisé...
+          </h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            Veuillez patienter pendant que nous vous redirigeons vers votre passerelle de paiement.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0 && !loading && !isSubmitting && !isRedirecting) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center space-y-5">
         <div className="w-20 h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
@@ -466,6 +494,16 @@ export const CheckoutPage: React.FC = () => {
                 </span>
               </div>
               
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Frais de livraison :</span>
+                </span>
+                <span className="font-bold text-slate-950">
+                  {formatFCFA(DELIVERY_FEE)}
+                </span>
+              </div>
+              
               <div className="flex justify-between pt-3 border-t border-slate-200/80 text-sm font-black text-slate-950">
                 <span>Total à régler :</span>
                 <span className="text-blue-700 text-xl font-black">
@@ -491,15 +529,15 @@ export const CheckoutPage: React.FC = () => {
             <button
               id="confirm-order-btn"
               onClick={handlePlaceOrder}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRedirecting}
               className={`w-full py-4 px-6 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all shadow-lg active:scale-98 cursor-pointer ${
-                isSubmitting
+                isSubmitting || isRedirecting
                   ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
               }`}
             >
-              {isSubmitting ? (
-                <span>Redirection vers Stripe...</span>
+              {isSubmitting || isRedirecting ? (
+                <span>Redirection vers le paiement...</span>
               ) : (
                 <>
                   <span>Payer et Valider ({formatFCFA(finalTotal)})</span>

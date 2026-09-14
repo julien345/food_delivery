@@ -89,16 +89,8 @@ export const orderApi = {
   },
 
   create: async (dto: CreateOrderDto): Promise<Order> => {
-    try {
-      const res = await apiClient.post<any>('/api/orders', dto);
-      return res.data?.data || res.data;
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        const res = await apiClient.post<any>('/orders', dto);
-        return res.data?.data || res.data;
-      }
-      throw err;
-    }
+    const res = await apiClient.post<any>('/orders', dto);
+    return res.data?.data || res.data;
   },
 
   updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {

@@ -13,8 +13,8 @@ export const getApiBaseUrl = (): string => {
 
   const envUrl =
     import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL ||
-  'https://juliens-food-api.onrender.com';
+    import.meta.env.VITE_API_BASE_URL||
+  'https://juliens-food-api.onrender.com';;
 
   if (envUrl && envUrl.trim()) {
     return envUrl.trim().replace(/\/+$/, '');
@@ -123,16 +123,7 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        let res;
-        try {
-          res = await apiClient.post('/api/auth/refresh', { refreshToken });
-        } catch (rErr: any) {
-          if (rErr.response?.status === 404) {
-            res = await apiClient.post('/auth/refresh', { refreshToken });
-          } else {
-            throw rErr;
-          }
-        }
+        const res = await apiClient.post('/auth/refresh', { refreshToken });
         const tokenData = res.data?.data || res.data;
         const newAccessToken = tokenData.accessToken;
         const newRefreshToken = tokenData.refreshToken || refreshToken;
@@ -162,9 +153,12 @@ apiClient.interceptors.response.use(
             path.startsWith('/addresses');
 
           if (isProtectedRoute && !path.startsWith('/login')) {
-            window.location.href = `/login?redirect=${encodeURIComponent(
-              path
-            )}&reason=order_auth_required`;
+            const isRestrictedTarget =
+              path.startsWith('/admin') || path.startsWith('/delivery');
+            const target = isRestrictedTarget
+              ? '/login'
+              : `/login?redirect=${encodeURIComponent(path)}&reason=order_auth_required`;
+            window.location.href = target;
           }
         }
         return Promise.reject(refreshErr);

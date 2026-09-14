@@ -29,6 +29,7 @@ import { DishCard } from '../components/common/DishCard';
 import { formatFCFA } from '../utils/format';
 import { getDishImageUrl, getCategoryImageUrl } from '../utils/image';
 import { NetflixLoader } from '../components/common/NetflixLoader';
+import { LogoLoader } from '../components/common/LogoLoader';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '../store/auth.store';
 import { useAuthNoticeStore } from '../store/authNotice.store';
@@ -201,11 +202,19 @@ export const HomePage: React.FC = () => {
   };
 
   const categoryScrollRef = useRef<HTMLDivElement>(null);
+  const mobileCategoryScrollRef = useRef<HTMLDivElement>(null);
 
   const scrollCategories = (direction: 'left' | 'right') => {
     if (categoryScrollRef.current) {
       const scrollAmount = direction === 'left' ? -240 : 240;
       categoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+    }
+  };
+
+  const scrollMobileCategories = (direction: 'left' | 'right') => {
+    if (mobileCategoryScrollRef.current) {
+      const scrollAmount = direction === 'left' ? -180 : 180;
+      mobileCategoryScrollRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' });
     }
   };
 
@@ -363,35 +372,16 @@ export const HomePage: React.FC = () => {
               </div>
             </div>
 
-            {/* Hero Visual Card (Specialty of the day) - Desktop */}
+            {/* Hero Visual Card - Desktop */}
             <div className="lg:col-span-5 hidden lg:block">
-              <div className="relative group bg-gradient-to-br from-slate-900/90 to-slate-950/90 backdrop-blur-xl rounded-3xl p-5 border border-white/10 shadow-2xl space-y-4 ring-1 ring-white/10">
+              <div className="relative group bg-gradient-to-br from-slate-900/90 to-slate-950/90 backdrop-blur-xl rounded-3xl p-4 border border-white/10 shadow-2xl space-y-4 ring-1 ring-white/10">
                 <div className="relative rounded-2xl overflow-hidden aspect-16/10 shadow-lg">
                   <img
                     src="https://res.cloudinary.com/tbygpchx/image/upload/v1788391631/camerounais.jpg"
-                    alt="Spécialité du chef"
+                    alt="Plat d'exception Julien's Food"
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent pointer-events-none" />
-
-                  {/* Float Badges */}
-                  <div className="absolute top-3 left-3 bg-slate-950/80 backdrop-blur-md px-3 py-1 rounded-full border border-white/20 text-amber-300 text-xs font-black flex items-center gap-1.5 shadow-md">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Coup de cœur Douala</span>
-                  </div>
-
-                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white">
-                    <div>
-                      <p className="text-xs font-semibold text-amber-300">Spécialité du Chef</p>
-                      <h4 className="font-display text-base font-black tracking-tight drop-shadow-md">
-                        Ndolè Royal aux Crevettes
-                      </h4>
-                    </div>
-                    <div className="bg-amber-400 text-slate-950 text-xs font-black px-2.5 py-1 rounded-xl shadow-md">
-                      4.9 ★
-                    </div>
-                  </div>
                 </div>
 
                 <div className="flex items-center justify-between pt-1">
@@ -430,35 +420,67 @@ export const HomePage: React.FC = () => {
                   {categories.length + 1}
                 </span>
               </div>
-              {selectedCategoryId && (
+
+              {/* Flèches de défilement (Mobile uniquement) */}
+              <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/80">
                 <button
-                  onClick={() => setSelectedCategoryId(null)}
-                  className="text-[11px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-full flex items-center gap-1 transition cursor-pointer border border-blue-100 shadow-2xs"
+                  type="button"
+                  id="mobile-cat-scroll-left-btn"
+                  onClick={() => scrollMobileCategories('left')}
+                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 active:bg-white transition cursor-pointer"
+                  title="Défiler vers la gauche"
+                  aria-label="Défiler vers la gauche"
                 >
-                  <span>Tous</span>
-                  <X className="w-3 h-3" />
+                  <ChevronLeft className="w-3.5 h-3.5" />
                 </button>
-              )}
+                <button
+                  type="button"
+                  id="mobile-cat-scroll-right-btn"
+                  onClick={() => scrollMobileCategories('right')}
+                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 active:bg-white transition cursor-pointer"
+                  title="Défiler vers la droite"
+                  aria-label="Défiler vers la droite"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             {/* Mobile Categories Touch Strip */}
-            <div className="flex items-start gap-3 overflow-x-auto pb-2 pt-1 px-1 no-scrollbar scroll-smooth">
-              {/* Category "Tous" on mobile */}
+            <div
+              ref={mobileCategoryScrollRef}
+              className="flex items-start gap-3 overflow-x-auto pb-2 pt-1 px-1 no-scrollbar scroll-smooth"
+            >
+              {/* Category "Toutes les catégories" on mobile */}
               <button
                 id="filter-category-all-mobile"
                 onClick={() => setSelectedCategoryId(null)}
-                className="flex flex-col items-center gap-1.5 shrink-0 min-w-[72px] max-w-[90px] cursor-pointer group active:scale-95 transition-transform select-none"
+                className="flex flex-col items-center gap-1.5 shrink-0 min-w-[74px] max-w-[94px] cursor-pointer group active:scale-95 transition-transform select-none"
               >
                 <div
                   className={`w-[58px] h-[58px] rounded-2xl p-0.5 transition-all duration-300 flex items-center justify-center ${
                     selectedCategoryId === null
                       ? 'ring-2 ring-blue-600 ring-offset-2 ring-offset-white bg-gradient-to-tr from-slate-950 via-blue-900 to-indigo-900 shadow-md shadow-blue-600/30 scale-105'
-                      : 'bg-gradient-to-tr from-slate-900 to-slate-800 border border-slate-700/60 shadow-xs'
+                      : 'bg-white border border-slate-200/90 shadow-xs'
                   }`}
                 >
-                  <div className="w-full h-full rounded-[13px] flex flex-col items-center justify-center text-white">
-                    <UtensilsCrossed className="w-5 h-5 text-amber-300" />
-                    <span className="text-[9px] font-black text-amber-200 mt-0.5">{safeDishes.length}</span>
+                  <div
+                    className={`w-full h-full rounded-[13px] flex flex-col items-center justify-center ${
+                      selectedCategoryId === null ? 'text-white' : 'text-slate-800 bg-slate-50'
+                    }`}
+                  >
+                    <UtensilsCrossed
+                      className={`w-5 h-5 ${
+                        selectedCategoryId === null ? 'text-amber-300' : 'text-blue-600'
+                      }`}
+                    />
+                    <span
+                      className={`text-[9px] font-black mt-0.5 ${
+                        selectedCategoryId === null ? 'text-amber-200' : 'text-slate-600'
+                      }`}
+                    >
+                      {safeDishes.length}
+                    </span>
                   </div>
                 </div>
                 <span
@@ -466,7 +488,7 @@ export const HomePage: React.FC = () => {
                     selectedCategoryId === null ? 'text-blue-700 font-black' : 'text-slate-700'
                   }`}
                 >
-                  Tous
+                  Toutes
                 </span>
                 {selectedCategoryId === null && (
                   <span className="w-1.5 h-1.5 rounded-full bg-blue-600 -mt-1" />
@@ -485,7 +507,7 @@ export const HomePage: React.FC = () => {
                   <button
                     key={cat.id}
                     id={`filter-category-mobile-${cat.id}`}
-                    onClick={() => setSelectedCategoryId(cat.id)}
+                    onClick={() => setSelectedCategoryId(isSelected ? null : cat.id)}
                     className="flex flex-col items-center gap-1.5 shrink-0 min-w-[74px] max-w-[94px] cursor-pointer group active:scale-95 transition-transform select-none"
                   >
                     <div
@@ -530,7 +552,7 @@ export const HomePage: React.FC = () => {
             </div>
           </div>
 
-          {/* DESKTOP DISPLAY (Classic Aesthetic Grid Cards Carousel) */}
+          {/* DESKTOP DISPLAY (Classic Aesthetic Strip Left-Aligned) */}
           <div className="hidden sm:block">
             <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
@@ -542,49 +564,38 @@ export const HomePage: React.FC = () => {
                   {categories.length + 1} univers
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                {selectedCategoryId && (
-                  <button
-                    onClick={() => setSelectedCategoryId(null)}
-                    className="text-xs font-bold text-blue-600 hover:text-blue-800 transition flex items-center gap-1 cursor-pointer bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-100"
-                  >
-                    <span>Afficher toute la carte</span>
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
 
-                {/* Navigation arrows for categories */}
-                <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
-                  <button
-                    type="button"
-                    id="cat-scroll-left-btn"
-                    onClick={() => scrollCategories('left')}
-                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
-                    title="Défiler vers la gauche"
-                    aria-label="Défiler vers la gauche"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    id="cat-scroll-right-btn"
-                    onClick={() => scrollCategories('right')}
-                    className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
-                    title="Défiler vers la droite"
-                    aria-label="Défiler vers la droite"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
+              {/* Navigation arrows for categories */}
+              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70">
+                <button
+                  type="button"
+                  id="cat-scroll-left-btn"
+                  onClick={() => scrollCategories('left')}
+                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
+                  title="Défiler vers la gauche"
+                  aria-label="Défiler vers la gauche"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  id="cat-scroll-right-btn"
+                  onClick={() => scrollCategories('right')}
+                  className="p-1.5 rounded-lg text-slate-600 hover:text-slate-950 hover:bg-white transition cursor-pointer shadow-none hover:shadow-xs active:scale-95"
+                  title="Défiler vers la droite"
+                  aria-label="Défiler vers la droite"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
             </div>
 
-            {/* Cards Carousel Strip Desktop */}
+            {/* Left-Aligned Cards Carousel Strip Desktop */}
             <div
               ref={categoryScrollRef}
-              className="flex items-stretch gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth"
+              className="flex items-stretch justify-start gap-3 overflow-x-auto pb-2 pt-1 no-scrollbar scroll-smooth"
             >
-              {/* Master card: Toute la carte */}
+              {/* Master card: Toutes les catégories */}
               <button
                 id="filter-category-all"
                 onClick={() => setSelectedCategoryId(null)}
@@ -602,7 +613,7 @@ export const HomePage: React.FC = () => {
                         : 'bg-white text-slate-700 shadow-xs border border-slate-200/70 group-hover:text-blue-600 group-hover:border-blue-200'
                     }`}
                   >
-                    <Utensils className="w-5 h-5 text-amber-400" />
+                    <UtensilsCrossed className={`w-5 h-5 ${selectedCategoryId === null ? 'text-amber-300' : 'text-blue-600'}`} />
                   </div>
                   <span
                     className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
@@ -616,14 +627,14 @@ export const HomePage: React.FC = () => {
                 </div>
                 <div>
                   <span className="font-display font-black text-sm block tracking-tight leading-snug">
-                    Toute la carte
+                    Toutes les catégories
                   </span>
                   <span
                     className={`text-[10px] font-medium block mt-0.5 ${
                       selectedCategoryId === null ? 'text-slate-300' : 'text-slate-400'
                     }`}
                   >
-                    Tous les délices
+                    {safeDishes.length} spécialités
                   </span>
                 </div>
               </button>
@@ -640,7 +651,7 @@ export const HomePage: React.FC = () => {
                   <button
                     key={cat.id}
                     id={`filter-category-${cat.id}`}
-                    onClick={() => setSelectedCategoryId(cat.id)}
+                    onClick={() => setSelectedCategoryId(isSelected ? null : cat.id)}
                     className={`shrink-0 min-w-[160px] p-4 rounded-2xl border text-left transition-all duration-300 flex flex-col justify-between gap-3 cursor-pointer group select-none ${
                       isSelected
                         ? 'bg-slate-950 text-white border-slate-950 shadow-lg shadow-slate-950/20 ring-2 ring-blue-500/40 -translate-y-0.5'
@@ -733,13 +744,7 @@ export const HomePage: React.FC = () => {
 
         {/* Loading State */}
         {loading ? (
-          <div className="py-6">
-            <NetflixLoader
-              variant="card"
-              size="md"
-              message="Loading"
-            />
-          </div>
+          <LogoLoader size="md" />
         ) : filteredDishes.length === 0 ? (
           /* Empty Search or Filter */
           <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-md mx-auto my-12 shadow-sm">

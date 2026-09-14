@@ -88,8 +88,8 @@ const normalizeUsersResponse = (resData: any): PaginatedUsersResponse => {
 };
 
 /**
- * Exécute une requête GET vers l'endpoint spécifié en gérant les variantes de chemin (/api/... et /...)
- * ainsi que le fallback sur /api/users avec filtre par rôle.
+ * Exécute une requête GET vers l'endpoint spécifié
+ * ainsi que le fallback sur /users avec filtre par rôle.
  */
 const fetchUsersEndpoint = async (
   endpoint: string,
@@ -102,47 +102,25 @@ const fetchUsersEndpoint = async (
       return normalized;
     }
   } catch (err: any) {
-    // Si l'endpoint échoue (404 ou autre), tenter avec ou sans le préfixe /api
+    // Si l'endpoint direct échoue, poursuivre
   }
 
-  const altEndpoint = endpoint.startsWith('/api/')
-    ? endpoint.replace(/^\/api/, '')
-    : `/api${endpoint}`;
-
-  try {
-    const altRes = await apiClient.get<any>(altEndpoint);
-    const normalized = normalizeUsersResponse(altRes.data);
-    if (normalized.data && normalized.data.length > 0) {
-      return normalized;
-    }
-  } catch {
-    // Poursuivre vers les fallbacks par rôle
-  }
-
-  // Fallback si l'API backend expose plutôt GET /api/users?role=...
+  // Fallback si l'API backend expose plutôt GET /users?role=...
   if (fallbackRole) {
     try {
-      const roleRes = await apiClient.get<any>('/api/users', { params: { role: fallbackRole } });
+      const roleRes = await apiClient.get<any>('/users', { params: { role: fallbackRole } });
       const normalized = normalizeUsersResponse(roleRes.data);
       if (normalized.data && normalized.data.length > 0) {
         return normalized;
       }
     } catch {
-      try {
-        const roleRes = await apiClient.get<any>('/users', { params: { role: fallbackRole } });
-        const normalized = normalizeUsersResponse(roleRes.data);
-        if (normalized.data && normalized.data.length > 0) {
-          return normalized;
-        }
-      } catch {
-        // Poursuivre
-      }
+      // Poursuivre
     }
   }
 
-  // Fallback global sur /api/users ou /users et filtrage par rôle si spécifié
+  // Fallback global sur /users et filtrage par rôle si spécifié
   try {
-    const globalRes = await apiClient.get<any>('/api/users');
+    const globalRes = await apiClient.get<any>('/users');
     const normalized = normalizeUsersResponse(globalRes.data);
     if (fallbackRole && normalized.data.length > 0) {
       return {
@@ -152,49 +130,37 @@ const fetchUsersEndpoint = async (
     }
     return normalized;
   } catch {
-    try {
-      const globalRes = await apiClient.get<any>('/users');
-      const normalized = normalizeUsersResponse(globalRes.data);
-      if (fallbackRole && normalized.data.length > 0) {
-        return {
-          ...normalized,
-          data: normalized.data.filter((u) => u.role === fallbackRole),
-        };
-      }
-      return normalized;
-    } catch {
-      return { data: [] };
-    }
+    return { data: [] };
   }
 };
 
 export const adminApi = {
   /**
-   * GET /api/users/clients
+   * GET /users/clients
    * Récupère la liste paginée des clients
    */
   getClients: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/api/users/clients', 'CLIENT');
+    return fetchUsersEndpoint('/users/clients', 'CLIENT');
   },
 
   /**
-   * GET /api/users/delivery-agents
+   * GET /users/delivery-agents
    * Récupère la liste paginée des livreurs
    */
   getDeliveryAgents: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/api/users/delivery-agents', 'DELIVERY_AGENT');
+    return fetchUsersEndpoint('/users/delivery-agents', 'DELIVERY_AGENT');
   },
 
   /**
-   * GET /api/users/admins
+   * GET /users/admins
    * Récupère la liste paginée des administrateurs
    */
   getAdmins: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/api/users/admins', 'ADMIN');
+    return fetchUsersEndpoint('/users/admins', 'ADMIN');
   },
 
   /**
-   * POST /api/users ou /users
+   * POST /users
    * Crée un compte utilisateur (rôles stricts : ADMIN ou DELIVERY_AGENT)
    */
   createUser: async (dto: CreateAdminUserDto): Promise<User> => {
@@ -218,31 +184,16 @@ export const adminApi = {
       payload.password = dto.password.trim();
     }
 
-    try {
-      const res = await apiClient.post<any>('/api/users', payload);
-      // Contrairement à la route d'inscription publique, la route admin POST /api/users
-      // renvoie uniquement l'objet User brut sans aucun token { id, email, firstName, lastName, phone, role }.
-      // Lecture directe de l'objet utilisateur sans chercher de propriété accessToken.
-      const raw = res.data?.data || res.data;
-      return normalizeUser({
-        ...raw,
-        phone: raw?.phone ?? cleanedPhone,
-      });
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        const fallbackRes = await apiClient.post<any>('/users', payload);
-        const raw = fallbackRes.data?.data || fallbackRes.data;
-        return normalizeUser({
-          ...raw,
-          phone: raw?.phone ?? cleanedPhone,
-        });
-      }
-      throw err;
-    }
+    const res = await apiClient.post<any>('/users', payload);
+    const raw = res.data?.data || res.data;
+    return normalizeUser({
+      ...raw,
+      phone: raw?.phone ?? cleanedPhone,
+    });
   },
 
   /**
-   * PATCH /api/users/:id ou /users/:id
+   * PATCH /users/:id
    * Met à jour le rôle d'un utilisateur (rôles stricts : ADMIN ou DELIVERY_AGENT)
    */
   updateUserRole: async (userId: string, role: AdminAssignableRole): Promise<User> => {
@@ -250,16 +201,8 @@ export const adminApi = {
       throw new Error("Règle métier : l'administrateur ne peut pas attribuer le rôle CLIENT.");
     }
 
-    try {
-      const res = await apiClient.patch<any>(`/api/users/${userId}`, { role });
-      return res.data?.data || res.data;
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        const fallbackRes = await apiClient.patch<any>(`/users/${userId}`, { role });
-        return fallbackRes.data?.data || fallbackRes.data;
-      }
-      throw err;
-    }
+    const res = await apiClient.patch<any>(`/users/${userId}`, { role });
+    return res.data?.data || res.data;
   },
 };
 

@@ -10,11 +10,8 @@ export const statsApi = {
     // La route officielle du backend est GET /analytics/stats
     const endpoints = [
       '/analytics/stats',
-      '/api/analytics/stats',
       '/analytics',
-      '/api/analytics',
       '/stats',
-      '/api/stats',
     ];
 
     for (const url of endpoints) {

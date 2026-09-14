@@ -5,7 +5,7 @@ import { paymentApi } from '../api/payment.api';
 import { Order, PaginationMeta, OrderStatus } from '../types';
 import { formatFCFA, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from '../utils/format';
 import { CancelOrderModal } from '../components/common/CancelOrderModal';
-import { NetflixLoader } from '../components/common/NetflixLoader';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   ShoppingBag,
   ArrowRight,
@@ -306,13 +306,7 @@ export const OrdersPage: React.FC = () => {
 
       {/* Loading State */}
       {loading ? (
-        <div className="py-6">
-          <NetflixLoader
-            variant="card"
-            size="md"
-            message="Loading"
-          />
-        </div>
+        <LogoLoader size="md" />
       ) : safeOrders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-md mx-auto space-y-4 shadow-sm">
           <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">

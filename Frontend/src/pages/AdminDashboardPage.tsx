@@ -9,7 +9,7 @@ import { uploadApi, fileToDataUrl } from '../api/upload.api';
 import { statsApi } from '../api/stats.api';
 import { AdminAnalyticsView } from '../components/admin/AdminAnalyticsView';
 import { UserTable } from '../components/admin/UserTable';
-import { NetflixLoader } from '../components/common/NetflixLoader';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   Order,
   Dish,
@@ -512,7 +512,7 @@ export const AdminDashboardPage: React.FC = () => {
         return;
       }
 
-      // Contrairement à la route d'inscription publique, la route admin POST /api/users
+      // Contrairement à la route d'inscription publique, la route admin POST /users
       // renvoie uniquement l'objet User brut sans token { id, email, firstName, lastName, phone, role }.
       // On lit directement cet objet sans chercher de propriété accessToken.
       const createdUser = await adminApi.createUser({
@@ -770,15 +770,9 @@ export const AdminDashboardPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Netflix-Style Admin Loader */}
+      {/* Julien's Food Logo Loader (sans fond d'écran) */}
       {loading && (
-        <div className="py-6">
-          <NetflixLoader
-            variant="card"
-            size="lg"
-            message="Loading"
-          />
-        </div>
+        <LogoLoader size="lg" />
       )}
 
       {/* Error Banner when server could not return data */}
@@ -1552,7 +1546,7 @@ export const AdminDashboardPage: React.FC = () => {
               emptyMessage={
                 userSearch
                   ? 'Aucun client ne correspond à votre filtre de recherche.'
-                  : 'La route GET /api/users/clients ne contient aucun client actuellement.'
+                  : 'La route GET /users/clients ne contient aucun client actuellement.'
               }
             />
           )}

@@ -29,8 +29,14 @@ export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'ADMIN') {
-      navigate('/admin', { replace: true });
+    if (isAuthenticated && user) {
+      if (user.role === 'ADMIN') {
+        navigate('/admin', { replace: true });
+      } else if (user.role === 'DELIVERY_AGENT') {
+        navigate('/delivery', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     }
   }, [isAuthenticated, user, navigate]);
 

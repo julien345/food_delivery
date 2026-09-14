@@ -7,7 +7,7 @@ import { StatusTimeline } from '../components/common/StatusTimeline';
 import { paymentApi } from '../api/payment.api';
 import { formatFCFA, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from '../utils/format';
 import { CancelOrderModal } from '../components/common/CancelOrderModal';
-import { NetflixLoader } from '../components/common/NetflixLoader';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   Clock,
   MapPin,
@@ -133,12 +133,8 @@ const handlePayNow = async () => {
 
   if (loading && !order) {
     return (
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        <NetflixLoader
-          variant="card"
-          size="md"
-          message="Loading"
-        />
+      <div className="max-w-4xl mx-auto px-4 py-16 flex items-center justify-center">
+        <LogoLoader size="md" />
       </div>
     );
   }

@@ -36,9 +36,10 @@ export const Navbar: React.FC = () => {
   const isClient = !isAuthenticated || user?.role === 'CLIENT';
 
   const handleLogout = () => {
-    logout();
     setProfileDropdownOpen(false);
-    navigate('/login');
+    setMobileMenuOpen(false);
+    logout();
+    navigate('/login', { replace: true });
   };
 
   const isCurrent = (path: string) => location.pathname === path;
@@ -48,19 +49,19 @@ export const Navbar: React.FC = () => {
       {/* Main Header */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 sm:h-20">
-          {/* Brand Logo - On the left for both mobile & desktop */}
+          {/* Brand Logo - Centered more towards center on mobile, left on desktop */}
           <Link
             to={isAdmin ? '/admin' : isDelivery ? '/delivery' : '/'}
-            className="flex items-center gap-2.5 sm:gap-3 group shrink-0"
+            className="flex items-center gap-2.5 sm:gap-3 group shrink-0 ml-3 sm:ml-6 md:ml-0 transition-all"
           >
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-slate-950 via-blue-900 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-blue-950/20 group-hover:scale-105 transition-all duration-300 border border-white/15 ring-2 ring-amber-400/25">
-              <UtensilsCrossed className="w-5 h-5 text-amber-300 group-hover:rotate-12 transition-transform duration-300" />
+            <div className="w-11 h-11 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-slate-950 via-blue-900 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-blue-950/20 group-hover:scale-105 transition-all duration-300 border border-white/15 ring-2 ring-amber-400/25">
+              <UtensilsCrossed className="w-5.5 h-5.5 sm:w-5 sm:h-5 text-amber-300 group-hover:rotate-12 transition-transform duration-300" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-display text-[22px] sm:text-2xl font-black tracking-tight text-slate-950 block leading-none">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-display text-[24px] sm:text-2xl font-black tracking-tight text-slate-950 block leading-none">
                 Julien's
               </span>
-              <span className="text-[10px] sm:text-[11px] font-black tracking-wider px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white uppercase leading-none shadow-xs border border-blue-500/30">
+              <span className="text-[11px] font-black tracking-wider px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 text-white uppercase leading-none shadow-xs border border-blue-500/30">
                 Food
               </span>
             </div>
@@ -157,7 +158,7 @@ export const Navbar: React.FC = () => {
           )}
 
           {/* Right Action Buttons */}
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
             {/* Cart Button: ONLY displayed for clients and visitors, NEVER for Admin or Delivery */}
             {isClient && (
               <button
@@ -199,9 +200,11 @@ export const Navbar: React.FC = () => {
                     <div className="text-xs font-bold text-slate-900 leading-tight">
                       {user.firstName}
                     </div>
-                    <div className="text-[10px] text-blue-600 font-semibold leading-none">
-                      {user.role}
-                    </div>
+                    {(isAdmin || isDelivery) && (
+                      <div className="text-[10px] text-blue-600 font-semibold leading-none">
+                        {isAdmin ? 'Admin' : 'Livreur'}
+                      </div>
+                    )}
                   </div>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
@@ -216,9 +219,11 @@ export const Navbar: React.FC = () => {
                         {user.firstName} {user.lastName}
                       </p>
                       <p className="text-[11px] text-slate-500 truncate">{user.email}</p>
-                      <span className="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-100">
-                        Rôle: {user.role === 'ADMIN' ? 'Administrateur' : user.role === 'DELIVERY_AGENT' ? 'Livreur' : user.role}
-                      </span>
+                      {(isAdmin || isDelivery) && (
+                        <span className="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                          Rôle: {isAdmin ? 'Administrateur' : 'Livreur'}
+                        </span>
+                      )}
                     </div>
 
                     <div className="py-1">
@@ -364,9 +369,11 @@ export const Navbar: React.FC = () => {
                 </div>
                 <div className="text-xs text-slate-500 truncate">{user.email}</div>
               </div>
-              <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
-                {user.role === 'ADMIN' ? 'Admin' : user.role === 'DELIVERY_AGENT' ? 'Livreur' : 'Client'}
-              </span>
+              {(isAdmin || isDelivery) && (
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-lg bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                  {isAdmin ? 'Admin' : 'Livreur'}
+                </span>
+              )}
             </div>
           )}
 
