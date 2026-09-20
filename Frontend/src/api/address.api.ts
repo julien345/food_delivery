@@ -21,26 +21,26 @@ export interface UpdateAddressDto {
 
 export const addressApi = {
   getAll: async (): Promise<Address[]> => {
-    const res = await apiClient.get<Address[]>('/addresses');
+    const res = await apiClient.get<Address[]>('/API/addresses');
     return res.data;
   },
 
   getById: async (id: string): Promise<Address> => {
-    const res = await apiClient.get<Address>(`/addresses/${id}`);
+    const res = await apiClient.get<Address>(`/API/addresses/${id}`);
     return res.data;
   },
 
   create: async (dto: CreateAddressDto): Promise<Address> => {
-    const res = await apiClient.post<Address>('/addresses', dto);
+    const res = await apiClient.post<Address>('/API/addresses', dto);
     return res.data;
   },
 
   update: async (id: string, dto: UpdateAddressDto): Promise<Address> => {
-    const res = await apiClient.put<Address>(`/addresses/${id}`, dto);
+    const res = await apiClient.put<Address>(`/API/addresses/${id}`, dto);
     return res.data;
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/addresses/${id}`);
+    await apiClient.delete(`/API/addresses/${id}`);
   },
 };

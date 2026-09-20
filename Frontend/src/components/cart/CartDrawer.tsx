@@ -206,14 +206,16 @@ export const CartDrawer: React.FC = () => {
                     {formatFCFA(total)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span>Livraison à Douala :</span>
-                  
+                <div className="flex justify-between items-center">
+                  <span>Frais de livraison :</span>
+                  <span className="font-bold text-slate-900">
+                    {formatFCFA(1000)}
+                  </span>
                 </div>
                 <div className="flex justify-between pt-2.5 border-t border-slate-200/80 text-sm font-black text-slate-950">
-                  <span>Total à payer :</span>
+                  <span>Total estimé :</span>
                   <span className="text-blue-700 text-lg">
-                    {formatFCFA(total)}
+                    {formatFCFA(total + 1000)}
                   </span>
                 </div>
               </div>

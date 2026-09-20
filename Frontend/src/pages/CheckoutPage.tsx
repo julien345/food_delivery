@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cart.store';
 import { useAuthStore } from '../store/auth.store';
@@ -7,6 +7,7 @@ import { orderApi } from '../api/order.api';
 import { paymentApi } from '../api/payment.api';
 import { Address } from '../types';
 import { formatFCFA } from '../utils/format';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   MapPin,
   ShoppingBag,
@@ -17,7 +18,10 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  Truck,
 } from 'lucide-react';
+
+const DELIVERY_FEE = 1000;
 
 export const CheckoutPage: React.FC = () => {
   const { items, total, fetchCart, clearCart } = useCartStore();
@@ -28,7 +32,20 @@ export const CheckoutPage: React.FC = () => {
   const [selectedAddressId, setSelectedAddressId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  const triggerError = (msg: string) => {
+    setErrorMsg(msg);
+    setTimeout(() => {
+      if (errorRef.current) {
+        errorRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 50);
+  };
 
   // Quick inline new address form
   const [showNewAddressForm, setShowNewAddressForm] = useState(false);
@@ -61,10 +78,14 @@ export const CheckoutPage: React.FC = () => {
 
   const handleSaveInlineAddress = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!newStreet.trim()) {
+      triggerError('Veuillez préciser votre rue ou quartier à Douala.');
+      return;
+    }
     try {
       const created = await addressApi.create({
         label: newLabel,
-        street: newStreet,
+        street: newStreet.trim(),
         city: newCity,
         isDefault: addresses.length === 0,
       });
@@ -72,8 +93,9 @@ export const CheckoutPage: React.FC = () => {
       setSelectedAddressId(created.id);
       setShowNewAddressForm(false);
       setNewStreet('');
+      setErrorMsg(null);
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.error || 'Erreur enregistrement adresse');
+      triggerError(err.response?.data?.error || 'Erreur enregistrement adresse');
     }
   };
 
@@ -94,21 +116,21 @@ export const CheckoutPage: React.FC = () => {
           targetAddressId = created.id;
           setShowNewAddressForm(false);
         } catch (aErr: any) {
-          setErrorMsg(aErr.response?.data?.error || "Veuillez renseigner votre adresse de livraison.");
+          triggerError(aErr.response?.data?.error || "Veuillez renseigner votre adresse de livraison.");
           return;
         }
       } else if (addresses.length > 0) {
         targetAddressId = addresses[0].id;
         setSelectedAddressId(targetAddressId);
       } else {
-        setErrorMsg('Veuillez renseigner votre adresse de livraison (rue/quartier) à Douala ci-dessus.');
+        triggerError('Veuillez renseigner votre adresse de livraison (rue/quartier) à Douala ci-dessus.');
         setShowNewAddressForm(true);
         return;
       }
     }
 
     if (items.length === 0) {
-      setErrorMsg('Votre panier est vide.');
+      triggerError('Votre panier est vide.');
       return;
     }
 
@@ -132,34 +154,33 @@ export const CheckoutPage: React.FC = () => {
           method: 'STRIPE',
         });
 
-        // 3. Validate payment URL and redirect to Stripe
+        // 3. Redirection directe vers la passerelle de paiement
+        const paymentUrl = paymentResponse?.paymentUrl;
         if (
-          paymentResponse?.paymentUrl &&
-          (paymentResponse.paymentUrl.startsWith('http://') ||
-            paymentResponse.paymentUrl.startsWith('https://'))
+          paymentUrl &&
+          (paymentUrl.startsWith('http://') || paymentUrl.startsWith('https://'))
         ) {
-          clearCart();
-          window.location.href = paymentResponse.paymentUrl;
+          setIsRedirecting(true);
+          // Le vidage du panier s'effectue en arrière-plan sans perturber le parcours client
+          clearCart().catch(() => {});
+          window.location.replace(paymentUrl);
           return;
         }
 
-        // If returned URL is relative or direct confirmation
-        clearCart();
-        navigate(`/orders/${newOrder.id}?payment=success`);
+        // Si confirmation directe ou retour d'URL interne
+        setIsRedirecting(true);
+        clearCart().catch(() => {});
+        navigate(`/orders/${newOrder.id}?payment=success`, { replace: true });
       } catch (pErr: any) {
         console.error('Erreur module paiement:', pErr);
-        // La commande est créée, diriger vers le suivi avec explication
-        clearCart();
-        const pErrMsg =
-          pErr.response?.data?.error ||
-          pErr.message ||
-          "Le module de paiement n'a pas pu être initialisé. Vous pouvez régler à la livraison ou réessayer.";
-        setErrorMsg(pErrMsg);
-        navigate(`/orders/${newOrder.id}`);
+        setIsRedirecting(true);
+        clearCart().catch(() => {});
+        navigate(`/orders/${newOrder.id}`, { replace: true });
       }
     } catch (err: any) {
       setIsSubmitting(false);
-      setErrorMsg(
+      setIsRedirecting(false);
+      triggerError(
         err.response?.data?.error ||
         err.message ||
         'Impossible de finaliser la commande. Veuillez vérifier vos articles et votre adresse.'
@@ -167,10 +188,34 @@ export const CheckoutPage: React.FC = () => {
     }
   };
 
-  
-  const finalTotal = total;
+  const finalTotal = total + (items.length > 0 ? DELIVERY_FEE : 0);
 
-  if (items.length === 0 && !loading) {
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 flex items-center justify-center">
+        <LogoLoader size="md" />
+      </div>
+    );
+  }
+
+  // Écran de transition vers le paiement sécurisé (ne montre jamais le panier vide)
+  if (isSubmitting || isRedirecting) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-24 text-center space-y-6">
+        <LogoLoader size="md" />
+        <div className="space-y-2">
+          <h2 className="font-display text-xl sm:text-2xl font-black text-slate-950">
+            Redirection vers le paiement sécurisé...
+          </h2>
+          <p className="text-sm text-slate-500 max-w-sm mx-auto">
+            Veuillez patienter pendant que nous vous redirigeons vers votre passerelle de paiement.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0 && !loading && !isSubmitting && !isRedirecting) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-20 text-center space-y-5">
         <div className="w-20 h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-xs">
@@ -209,9 +254,17 @@ export const CheckoutPage: React.FC = () => {
       </div>
 
       {errorMsg && (
-        <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center gap-3">
-          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
-          <span className="font-medium">{errorMsg}</span>
+        <div
+          ref={errorRef}
+          id="checkout-error-banner"
+          tabIndex={-1}
+          className="mb-6 p-4.5 rounded-2xl bg-rose-50 border-2 border-rose-300 text-rose-800 text-xs sm:text-sm flex items-start gap-3 shadow-md shadow-rose-600/10 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <AlertCircle className="w-5 h-5 shrink-0 text-rose-600 mt-0.5" />
+          <div className="flex-1">
+            <span className="font-bold block text-rose-900">Une attention est requise :</span>
+            <span className="font-medium text-rose-700">{errorMsg}</span>
+          </div>
         </div>
       )}
 
@@ -386,7 +439,7 @@ export const CheckoutPage: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-sm font-bold text-slate-950">
-                    Stripe Checkout (Cartes & Mobile Money)
+                    Carte
                   </h4>
                   <p className="text-xs text-slate-500">
                     Visa, Mastercard, cartes internationales et paiements sécurisés
@@ -441,6 +494,16 @@ export const CheckoutPage: React.FC = () => {
                 </span>
               </div>
               
+              <div className="flex justify-between items-center text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span>Frais de livraison :</span>
+                </span>
+                <span className="font-bold text-slate-950">
+                  {formatFCFA(DELIVERY_FEE)}
+                </span>
+              </div>
+              
               <div className="flex justify-between pt-3 border-t border-slate-200/80 text-sm font-black text-slate-950">
                 <span>Total à régler :</span>
                 <span className="text-blue-700 text-xl font-black">
@@ -449,19 +512,32 @@ export const CheckoutPage: React.FC = () => {
               </div>
             </div>
 
+            {/* In-place Error Notification */}
+            {errorMsg && (
+              <div
+                onClick={() => {
+                  errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }}
+                className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2 cursor-pointer hover:bg-rose-100/80 transition"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span className="line-clamp-2">{errorMsg}</span>
+              </div>
+            )}
+
             {/* Submit Action */}
             <button
               id="confirm-order-btn"
               onClick={handlePlaceOrder}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isRedirecting}
               className={`w-full py-4 px-6 rounded-2xl font-bold text-sm text-white flex items-center justify-center gap-2 transition-all shadow-lg active:scale-98 cursor-pointer ${
-                isSubmitting
+                isSubmitting || isRedirecting
                   ? 'bg-blue-400 cursor-not-allowed'
                   : 'bg-blue-600 hover:bg-blue-700 shadow-blue-600/25'
               }`}
             >
-              {isSubmitting ? (
-                <span>Redirection vers Stripe...</span>
+              {isSubmitting || isRedirecting ? (
+                <span>Redirection vers le paiement...</span>
               ) : (
                 <>
                   <span>Payer et Valider ({formatFCFA(finalTotal)})</span>
@@ -469,11 +545,6 @@ export const CheckoutPage: React.FC = () => {
                 </>
               )}
             </button>
-
-            <div className="text-[11px] text-slate-400 text-center flex items-center justify-center gap-1.5 pt-1">
-              <Clock className="w-3.5 h-3.5 text-blue-500" />
-              <span>Livraison estimée en 30 à 45 minutes à Douala</span>
-            </div>
           </div>
         </div>
       </div>

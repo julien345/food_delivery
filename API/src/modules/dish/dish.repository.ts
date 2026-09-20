@@ -52,7 +52,7 @@ class DishRepository {
     name: string;
     description?: string;
     price: number;
-    imageUrl?: string;
+    image: string;
     categoryId: string;
     isAvailable?: boolean;
   }, tx?: PrismaClientExecutor) {

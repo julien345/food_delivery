@@ -33,7 +33,7 @@ class DishService {
     name: string;
     description?: string;
     price: number;
-    imageUrl?: string;
+    image: string;
     categoryId: string;
   }) {
     const category = await categoryRepository.findById(data.categoryId);

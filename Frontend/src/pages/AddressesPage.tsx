@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { addressApi, CreateAddressDto } from '../api/address.api';
 import { Address } from '../types';
 import { MapPin, Plus, Trash2, Edit2, CheckCircle, Home, Building2, AlertCircle, X } from 'lucide-react';
+import { LogoLoader } from '../components/common/LogoLoader';
 
 export const AddressesPage: React.FC = () => {
   const [addresses, setAddresses] = useState<Address[]>([]);
@@ -109,11 +110,7 @@ export const AddressesPage: React.FC = () => {
       </div>
 
       {loading ? (
-        <div className="space-y-4">
-          {[1, 2].map((n) => (
-            <div key={n} className="bg-white p-6 rounded-2xl border border-slate-200 animate-pulse h-28" />
-          ))}
-        </div>
+        <LogoLoader size="md" />
       ) : addresses.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center max-w-md mx-auto space-y-4">
           <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">

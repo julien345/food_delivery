@@ -3,6 +3,7 @@ import { deliveryApi } from '../api/delivery.api';
 import { Delivery } from '../types';
 import { formatFCFA, formatDate, ORDER_STATUS_LABELS, ORDER_STATUS_STYLES } from '../utils/format';
 import { useAuthStore } from '../store/auth.store';
+import { LogoLoader } from '../components/common/LogoLoader';
 import {
   Truck,
   MapPin,
@@ -93,7 +94,7 @@ export const DeliveryPage: React.FC = () => {
         </h2>
 
         {loading ? (
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 animate-pulse h-36" />
+          <LogoLoader size="md" />
         ) : activeDeliveries.length === 0 ? (
           <div className="bg-white rounded-3xl border border-slate-200 p-8 text-center space-y-2">
             <Truck className="w-8 h-8 text-slate-400 mx-auto" />

@@ -15,7 +15,7 @@ export const orderApi = {
    */
   getMyOrders: async (params?: { page?: number; limit?: number }): Promise<PaginatedOrders> => {
     const res = await apiClient.get<PaginatedOrders | { data: Order[]; total?: number; meta?: any } | Order[]>(
-      '/orders/my-orders',
+      '/API/orders/my-orders',
       { params }
     );
     const raw = res.data;
@@ -63,7 +63,7 @@ export const orderApi = {
   },
 
   getAll: async (params?: { page?: number; limit?: number }): Promise<PaginatedOrders> => {
-    const res = await apiClient.get<PaginatedOrders | Order[]>('/orders', { params });
+    const res = await apiClient.get<PaginatedOrders | Order[]>('/API/orders', { params });
     if (Array.isArray(res.data)) {
       return {
         data: res.data,
@@ -79,30 +79,22 @@ export const orderApi = {
   },
 
   getById: async (id: string): Promise<Order> => {
-    const res = await apiClient.get<Order>(`/orders/${id}`);
+    const res = await apiClient.get<Order>(`/API/orders/${id}`);
     return res.data;
   },
 
   getByNumber: async (orderNumber: number): Promise<Order> => {
-    const res = await apiClient.get<Order>(`/orders/by-number/${orderNumber}`);
+    const res = await apiClient.get<Order>(`/API/orders/by-number/${orderNumber}`);
     return res.data;
   },
 
   create: async (dto: CreateOrderDto): Promise<Order> => {
-    try {
-      const res = await apiClient.post<any>('/api/orders', dto);
-      return res.data?.data || res.data;
-    } catch (err: any) {
-      if (err.response?.status === 404) {
-        const res = await apiClient.post<any>('/orders', dto);
-        return res.data?.data || res.data;
-      }
-      throw err;
-    }
+    const res = await apiClient.post<any>('/API/orders', dto);
+    return res.data?.data || res.data;
   },
 
   updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
-    const res = await apiClient.patch<Order>(`/orders/${id}/status`, { status });
+    const res = await apiClient.patch<Order>(`/API/orders/${id}/status`, { status });
     return res.data;
   },
 
@@ -111,7 +103,7 @@ export const orderApi = {
    * Tries PATCH /orders/:id/assign, with fallback support for POST /deliveries.
    */
   assignDeliveryAgent: async (id: string, deliveryAgentId: string): Promise<Order> => {
-    const res = await apiClient.patch<Order>(`/orders/${id}/assign`, {
+    const res = await apiClient.patch<Order>(`/API/orders/${id}/assign`, {
       deliveryAgentId,
       agentId: deliveryAgentId,
     });

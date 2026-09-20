@@ -51,19 +51,19 @@ class OrderRepository {
   }
   
   findByUserIdPaginated(userId: string, skip: number, take: number) {
-  return prisma.$transaction([
-    prisma.order.findMany({
-      where: { userId },
-      include: { items: true, address: true, payment: true, delivery: true },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take,
-    }),
-    prisma.order.count({ where: { userId } }),
-  ]).then(([data, total]) => ({ data, total }));
-}
+    return prisma.$transaction([
+      prisma.order.findMany({
+        where: { userId },
+        include: { items: true, address: true, payment: true, delivery: true },
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
+      prisma.order.count({ where: { userId } }),
+    ]).then(([data, total]) => ({ data, total }));
+  }
 
- async createFromCart(
+  async createFromCart(
     userId: string,
     addressId: string,
     orderItems: CreateOrderItemsInput[],
@@ -71,12 +71,18 @@ class OrderRepository {
     deliveryAddressSnapshot: string,
     tx: PrismaClientExecutor
   ) {
-    const totalAmount = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const DEFAULT_DELIVERY_FEE = 1000;
+    
+    // Somme des plats
+    const itemsSubtotal = orderItems.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    // Montant total = sous-total + frais de livraison
+    const totalAmount = itemsSubtotal + DEFAULT_DELIVERY_FEE;
 
     const order = await tx.order.create({
       data: {
         userId,
         addressId,
+        deliveryFee: DEFAULT_DELIVERY_FEE,
         totalAmount,
         deliveryAddressSnapshot,
         items: {
@@ -100,9 +106,6 @@ class OrderRepository {
   updateStatus(id: string, status: OrderStatus, tx?: PrismaClientExecutor) {
     return this.getClient(tx).order.update({ where: { id }, data: { status } });
   }
-  
-
- 
 }
 
 export default new OrderRepository();

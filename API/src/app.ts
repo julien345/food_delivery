@@ -42,17 +42,20 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({limit: '5mb', extended: true }));
 
 // Routes
-app.use("/auth", authRoutes);
-app.use("/categories", categoryRoutes);
-app.use("/dishes", dishRoutes);
-app.use("/addresses", addressRoutes);
-app.use("/cart", cartRoutes);
-app.use("/orders", orderRoutes);
-app.use("/deliveries", deliveryRoutes);
-app.use("/payments", paymentRoutes);
-app.use("/users", userRoutes);
+app.use("/API/auth", authRoutes);
+app.use("/API/categories", categoryRoutes);
+app.use("/API/dishes", dishRoutes);
+app.use("/API/addresses", addressRoutes);
+app.use("/API/cart", cartRoutes);
+app.use("/API/orders", orderRoutes);
+app.use("/API/deliveries", deliveryRoutes);
+app.use("/API/payments", paymentRoutes);
+app.use("/API/users", userRoutes);
 app.use("/uploads", uploadRoutes);
 app.use("/analytics", analyticsRoutes);
+// Error handling middleware
+app.use(errorHandler);
+
 // Error handling middleware
 app.use(errorHandler);
 export default app;

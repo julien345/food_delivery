@@ -22,7 +22,7 @@ class StripeProvider implements PaymentProvider {
       price_data: {
         currency: params.currency,
         product_data: { name: item.name },
-        unit_amount: this.toStripeAmount(item.unitPrice, params.currency),
+        unit_amount: this.toStripeAmount(Number(item.unitPrice), params.currency), // Sécurité sur le type monétaire
       },
       quantity: item.quantity,
     }));
