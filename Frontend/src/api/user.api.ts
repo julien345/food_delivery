@@ -36,7 +36,7 @@ export const userApi = {
       if (users.length > 0) return users.map(normalizeUser);
 
       // Fallback historique sur /users ou /api/users
-      const res = await apiClient.get<any>('/users');
+      const res = await apiClient.get<any>('/API/users');
       const data = res.data;
       if (Array.isArray(data)) return data.map(normalizeUser);
       if (data && Array.isArray(data.data)) return data.data.map(normalizeUser);

@@ -13,7 +13,7 @@ export interface PaginatedDeliveries {
 
 export const deliveryApi = {
   assign: async (dto: AssignDeliveryDto): Promise<Delivery> => {
-    const res = await apiClient.post<Delivery>('/deliveries', dto);
+    const res = await apiClient.post<Delivery>('/API/deliveries', dto);
     return res.data;
   },
 
@@ -22,7 +22,7 @@ export const deliveryApi = {
    * Handles both direct array Delivery[] and wrapped pagination object { data: Delivery[], meta: any }.
    */
   getMyDeliveries: async (): Promise<Delivery[]> => {
-    const res = await apiClient.get<Delivery[] | PaginatedDeliveries | { data: Delivery[] }>('/deliveries/my-deliveries');
+    const res = await apiClient.get<Delivery[] | PaginatedDeliveries | { data: Delivery[] }>('/API/deliveries/my-deliveries');
     if (Array.isArray(res.data)) {
       return res.data;
     }
@@ -33,7 +33,7 @@ export const deliveryApi = {
   },
 
   markAsDelivered: async (deliveryId: string): Promise<Delivery> => {
-    const res = await apiClient.patch<Delivery>(`/deliveries/${deliveryId}/deliver`);
+    const res = await apiClient.patch<Delivery>(`/API/deliveries/${deliveryId}/deliver`);
     return res.data;
   },
 };

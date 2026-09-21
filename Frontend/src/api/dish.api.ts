@@ -28,7 +28,7 @@ export const dishApi = {
    */
   getAll: async (params?: { page?: number; limit?: number; categoryId?: string }): Promise<PaginatedDishes> => {
     const res = await apiClient.get<PaginatedDishes | { data: Dish[]; meta?: any; total?: number } | Dish[]>(
-      '/dishes',
+      '/API/dishes',
       { params }
     );
     const raw = res.data;
@@ -70,7 +70,7 @@ export const dishApi = {
   },
 
   getById: async (id: string): Promise<Dish> => {
-    const res = await apiClient.get<Dish>(`/dishes/${id}`);
+    const res = await apiClient.get<Dish>(`/API/dishes/${id}`);
     return res.data;
   },
 
@@ -90,7 +90,7 @@ export const dishApi = {
       payload.imageUrl = imageVal;
     }
 
-    const res = await apiClient.post<any>('/dishes', payload);
+    const res = await apiClient.post<any>('/API/dishes', payload);
     const raw = res.data?.data || res.data;
     const returnedImg = raw?.image || raw?.imageUrl || imageVal;
     return {
@@ -115,7 +115,7 @@ export const dishApi = {
       payload.imageUrl = imageVal;
     }
 
-    const res = await apiClient.put<any>(`/dishes/${id}`, payload);
+    const res = await apiClient.put<any>(`/API/dishes/${id}`, payload);
     const raw = res.data?.data || res.data;
     const returnedImg = raw?.image || raw?.imageUrl || imageVal;
     return {
@@ -126,7 +126,7 @@ export const dishApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/dishes/${id}`);
+    await apiClient.delete(`/API/dishes/${id}`);
   },
 
   /**

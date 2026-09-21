@@ -13,8 +13,8 @@ export const getApiBaseUrl = (): string => {
 
   const envUrl =
     import.meta.env.VITE_API_URL ||
-    import.meta.env.VITE_API_BASE_URL||
-  'https://juliens-food-api.onrender.com';;
+    import.meta.env.VITE_API_BASE_URL ||
+    'https://juliens-food-api.onrender.com';
 
   if (envUrl && envUrl.trim()) {
     return envUrl.trim().replace(/\/+$/, '');
@@ -123,7 +123,7 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const res = await apiClient.post('/auth/refresh', { refreshToken });
+        const res = await apiClient.post('/API/auth/refresh', { refreshToken });
         const tokenData = res.data?.data || res.data;
         const newAccessToken = tokenData.accessToken;
         const newRefreshToken = tokenData.refreshToken || refreshToken;

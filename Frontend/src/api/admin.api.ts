@@ -108,7 +108,7 @@ const fetchUsersEndpoint = async (
   // Fallback si l'API backend expose plutôt GET /users?role=...
   if (fallbackRole) {
     try {
-      const roleRes = await apiClient.get<any>('/users', { params: { role: fallbackRole } });
+      const roleRes = await apiClient.get<any>('/API/users', { params: { role: fallbackRole } });
       const normalized = normalizeUsersResponse(roleRes.data);
       if (normalized.data && normalized.data.length > 0) {
         return normalized;
@@ -120,7 +120,7 @@ const fetchUsersEndpoint = async (
 
   // Fallback global sur /users et filtrage par rôle si spécifié
   try {
-    const globalRes = await apiClient.get<any>('/users');
+    const globalRes = await apiClient.get<any>('/API/users');
     const normalized = normalizeUsersResponse(globalRes.data);
     if (fallbackRole && normalized.data.length > 0) {
       return {
@@ -140,7 +140,7 @@ export const adminApi = {
    * Récupère la liste paginée des clients
    */
   getClients: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/users/clients', 'CLIENT');
+    return fetchUsersEndpoint('/API/users/clients', 'CLIENT');
   },
 
   /**
@@ -148,7 +148,7 @@ export const adminApi = {
    * Récupère la liste paginée des livreurs
    */
   getDeliveryAgents: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/users/delivery-agents', 'DELIVERY_AGENT');
+    return fetchUsersEndpoint('/API/users/delivery-agents', 'DELIVERY_AGENT');
   },
 
   /**
@@ -156,7 +156,7 @@ export const adminApi = {
    * Récupère la liste paginée des administrateurs
    */
   getAdmins: async (): Promise<PaginatedUsersResponse> => {
-    return fetchUsersEndpoint('/users/admins', 'ADMIN');
+    return fetchUsersEndpoint('/API/users/admins', 'ADMIN');
   },
 
   /**
@@ -184,7 +184,7 @@ export const adminApi = {
       payload.password = dto.password.trim();
     }
 
-    const res = await apiClient.post<any>('/users', payload);
+    const res = await apiClient.post<any>('/API/users', payload);
     const raw = res.data?.data || res.data;
     return normalizeUser({
       ...raw,
@@ -201,7 +201,7 @@ export const adminApi = {
       throw new Error("Règle métier : l'administrateur ne peut pas attribuer le rôle CLIENT.");
     }
 
-    const res = await apiClient.patch<any>(`/users/${userId}`, { role });
+    const res = await apiClient.patch<any>(`/API/users/${userId}`, { role });
     return res.data?.data || res.data;
   },
 };

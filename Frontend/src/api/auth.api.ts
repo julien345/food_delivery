@@ -29,7 +29,7 @@ export const authApi = {
       ...dto,
       phone: cleanedPhone,
     };
-    const res = await apiClient.post<any>('/auth/register', payload);
+    const res = await apiClient.post<any>('/API/auth/register', payload);
     const data = res.data?.data || res.data;
     return {
       ...data,
@@ -38,7 +38,7 @@ export const authApi = {
   },
 
   login: async (dto: LoginDto): Promise<AuthResponse> => {
-    const res = await apiClient.post<any>('/auth/login', dto);
+    const res = await apiClient.post<any>('/API/auth/login', dto);
     const data = res.data?.data || res.data;
     return {
       ...data,
@@ -47,7 +47,7 @@ export const authApi = {
   },
 
   refresh: async (refreshToken: string): Promise<{ accessToken: string; refreshToken: string }> => {
-    const res = await apiClient.post<any>('/auth/refresh', {
+    const res = await apiClient.post<any>('/API/auth/refresh', {
       refreshToken,
     });
     return res.data?.data || res.data;
@@ -57,7 +57,7 @@ export const authApi = {
    * Récupère le profil de l'utilisateur connecté via GET /auth/profile
    */
   getProfile: async (): Promise<User> => {
-    const res = await apiClient.get<any>('/auth/profile');
+    const res = await apiClient.get<any>('/API/auth/profile');
     const data = res.data?.data || res.data;
     return normalizeUser(data.user || data);
   },
@@ -77,12 +77,12 @@ export const authApi = {
       phone: cleanedPhone,
     };
     try {
-      const res = await apiClient.patch<any>('/auth/profile', payload);
+      const res = await apiClient.patch<any>('/API/auth/profile', payload);
       const data = res.data?.data || res.data;
       return normalizeUser(data.user || data);
     } catch (patchErr: any) {
       if (patchErr.response?.status === 404 || patchErr.response?.status === 405) {
-        const putRes = await apiClient.put<any>('/auth/profile', payload);
+        const putRes = await apiClient.put<any>('/API/auth/profile', payload);
         const data = putRes.data?.data || putRes.data;
         return normalizeUser(data.user || data);
       }

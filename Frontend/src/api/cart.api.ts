@@ -8,25 +8,25 @@ export interface AddToCartDto {
 
 export const cartApi = {
   getCart: async (): Promise<Cart> => {
-    const res = await apiClient.get<Cart>('/cart');
+    const res = await apiClient.get<Cart>('/API/cart');
     return res.data;
   },
 
   addItem: async (dto: AddToCartDto): Promise<any> => {
-    const res = await apiClient.post('/cart/items', dto);
+    const res = await apiClient.post('/API/cart/items', dto);
     return res.data;
   },
 
   updateItem: async (itemId: string, quantity: number): Promise<any> => {
-    const res = await apiClient.put(`/cart/items/${itemId}`, { quantity });
+    const res = await apiClient.put(`/API/cart/items/${itemId}`, { quantity });
     return res.data;
   },
 
   removeItem: async (itemId: string): Promise<void> => {
-    await apiClient.delete(`/cart/items/${itemId}`);
+    await apiClient.delete(`/API/cart/items/${itemId}`);
   },
 
   clearCart: async (): Promise<void> => {
-    await apiClient.delete('/cart');
+    await apiClient.delete('/API/cart');
   },
 };

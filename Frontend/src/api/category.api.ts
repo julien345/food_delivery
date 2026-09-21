@@ -5,7 +5,7 @@ export type { CreateCategoryDto, UpdateCategoryDto };
 
 export const categoryApi = {
   getAll: async (): Promise<Category[]> => {
-    const res = await apiClient.get<Category[] | { data: Category[] }>('/categories');
+    const res = await apiClient.get<Category[] | { data: Category[] }>('/API/categories');
     let list: Category[] = [];
     if (Array.isArray(res.data)) {
       list = res.data;
@@ -19,7 +19,7 @@ export const categoryApi = {
   },
 
   getById: async (id: string): Promise<Category> => {
-    const res = await apiClient.get<any>(`/categories/${id}`);
+    const res = await apiClient.get<any>(`/API/categories/${id}`);
     const data = res.data?.data || res.data;
     return {
       ...data,
@@ -34,7 +34,7 @@ export const categoryApi = {
     if (dto.image) {
       payload.image = dto.image;
     }
-    const res = await apiClient.post<any>('/categories', payload);
+    const res = await apiClient.post<any>('/API/categories', payload);
     const data = res.data?.data || res.data;
     return {
       ...data,
@@ -47,7 +47,7 @@ export const categoryApi = {
     if (dto.name !== undefined) payload.name = dto.name;
     if (dto.image !== undefined) payload.image = dto.image;
 
-    const res = await apiClient.put<any>(`/categories/${id}`, payload);
+    const res = await apiClient.put<any>(`/API/categories/${id}`, payload);
     const data = res.data?.data || res.data;
     return {
       ...data,
@@ -56,6 +56,6 @@ export const categoryApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/categories/${id}`);
+    await apiClient.delete(`/API/categories/${id}`);
   },
 };

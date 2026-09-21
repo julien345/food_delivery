@@ -53,10 +53,10 @@ export const uploadApi = {
    */
   uploadImage: async (file: File): Promise<UploadImageResponse> => {
     const endpoints = [
-      '/uploads/image',
-      '/uploads',
-      '/upload/image',
-      '/upload',
+      '/API/uploads/image',
+      '/API/uploads',
+      '/API/upload/image',
+      '/API/upload',
     ];
 
     let lastError: any = null;
