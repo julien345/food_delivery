@@ -132,3 +132,4 @@ src/
 
 # branch test
 # changement direct sur main
+## Section ajoutée pour la pratique
