@@ -7,8 +7,29 @@ on:
     branches: [main]
 
 jobs:
-  hello:
+  build-and-test:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./API
+
     steps:
-      - name: Dire bonjour
-        run: echo "Pipeline déclenché avec succès"
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      - name: Installer Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.21.0'
+          cache: 'npm'
+          cache-dependency-path: ./API/package-lock.json
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Générer le client Prisma
+        run: npx prisma generate
+
+      - name: Compiler le TypeScript
+        run: npm run build
