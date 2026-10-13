@@ -2,30 +2,27 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '../store/auth.store';
 
 export const getApiBaseUrl = (): string => {
+  // Étape 1 : Priorité absolue au débogage local via le navigateur (Super-pouvoir DevOps)
   if (typeof window !== 'undefined') {
     const custom =
       localStorage.getItem('julien_api_url') ||
       localStorage.getItem('custom_api_url');
     if (custom && custom.trim()) {
-      return custom.trim().replace(/\/+$/, '');
+      return custom.trim().replace(/\/+\$/, '');
     }
   }
-
+  
   const envUrl =
     import.meta.env.VITE_API_URL ||
     import.meta.env.VITE_API_BASE_URL ||
-    'https://juliens-food-api.onrender.com';
+    '/API';
 
-  if (envUrl && envUrl.trim()) {
-    return envUrl.trim().replace(/\/+$/, '');
-  }
-
-  return 'https://juliens-food-api.onrender.com';
+  return envUrl.trim().replace(/\/+\$/, '');
 };
 
 export const setCustomApiUrl = (url: string): void => {
   if (typeof window !== 'undefined') {
-    const cleaned = (url || '').trim().replace(/\/+$/, '');
+    const cleaned = (url || '').trim().replace(/\/+\$/, '');
     if (cleaned) {
       localStorage.setItem('julien_api_url', cleaned);
     } else {
@@ -123,7 +120,8 @@ apiClient.interceptors.response.use(
           throw new Error('No refresh token available');
         }
 
-        const res = await apiClient.post('/API/auth/refresh', { refreshToken });
+        // Utilisation de la route relative propre gérée par Nginx
+        const res = await apiClient.post('/auth/refresh', { refreshToken });
         const tokenData = res.data?.data || res.data;
         const newAccessToken = tokenData.accessToken;
         const newRefreshToken = tokenData.refreshToken || refreshToken;

@@ -48,5 +48,9 @@
     "eslint": "^10.7.0",
     "prettier": "^3.9.6",
     "tsx": "^4.23.1"
+  },
+  "prisma": {
+    "seed": "npx tsx prisma/seed.ts"
   }
+
 }

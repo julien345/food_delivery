@@ -1,6 +1,8 @@
 services:
+  # --- 1. BASE DE DONNÉES (POSTGRESQL) ---
   db:
     image: postgres:16-alpine
+    container_name: julien-DB
     environment:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -8,26 +10,33 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
+    # Pas de port exposé à l'extérieur pour plus de sécurité.
+    # L'API peut y accéder via le réseau interne Docker.
 
+  # --- 2. BACKEND (API EXPRESS / PRISMA) ---
   api:
     build: ./API
+    container_name: julien-API
     env_file:
       - ./API/.env
     environment:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
     depends_on:
       - db
+    # Le port 3000 reste accessible localement ou via Nginx
     ports:
       - "3000:3000"
     restart: unless-stopped
 
+  # --- 3. FRONTEND (REACT / TS + NGINX) ---
   web:
-    build:
-      context: ./Frontend
-      args:
-        VITE_API_URL: http://localhost:8081
+    build: ./Frontend
+    container_name: julien-web
+    # Nginx a besoin que l'API ait démarré pour pouvoir rediriger les requêtes
     depends_on:
       - api
+    # Nginx écoute sur le port 80 à l'intérieur du conteneur.
+    # On l'expose sur le port 8081 sur ton PC local.
     ports:
       - "8081:80"
     restart: unless-stopped
