@@ -19,9 +19,9 @@ export const paymentApi = {
     };
 
     const endpoints = [
-      '/API/payments/initiate',
-      '/API/payment/initiate',
-      '/API/payments/stripe',
+      '/payments/initiate',
+      '/payment/initiate',
+      '/payments/stripe',
     ];
 
     let lastError: any = null;

@@ -9,9 +9,9 @@ export const statsApi = {
   getStats: async (): Promise<DashboardStats | null> => {
     // La route officielle du backend est GET /analytics/stats
     const endpoints = [
-      '/API/analytics/stats',
-      '/API/analytics',
-      '/API/stats',
+      '/analytics/stats',
+      '/analytics',
+      '/stats',
     ];
 
     for (const url of endpoints) {
