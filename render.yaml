@@ -4,7 +4,7 @@ databases:
     region: frankfurt
 
 services:
-  # --- 1. BACKEND (API) ---
+  # --- 1. BACKEND (API via votre image GHCR) ---
   - type: web
     name: julien-food-api
     runtime: image
@@ -12,7 +12,6 @@ services:
     region: frankfurt
     image:
       url: ghcr.io/julien345/food_delivery-api:latest
-    # On force l'écoute sur le port 3000 correspondant à votre configuration Docker locale
     dockerCommand: sh -c "npx prisma migrate deploy && node dist/server.js"
     envVars:
       - key: PORT
@@ -38,17 +37,20 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-  # --- 2. FRONTEND (WEB) ---
+  # --- 2. FRONTEND (Compilé directement par Render) ---
   - type: web
     name: julien-food-web
-    runtime: image
+    runtime: docker
     plan: free
     region: frankfurt
-    image:
-      url: ghcr.io/julien345/food_delivery-frontend:latest # Ajustez le nom de l'image si nécessaire
+    repo: https://github.com
+    branch: main
+    dockerfilePath: Frontend/Dockerfile
+    # On laisse le Root Directory vide par défaut pour donner tout le contexte à Docker
+    # On passe l'URL publique de l'API à l'instruction ARG de votre Dockerfile
+    buildArgs:
+      - key: VITE_API_URL
+        value: https://onrender.com
     envVars:
       - key: PORT
         value: 80
-      - key: VITE_API_URL
-        # Utilise l'URL réseau privée et sécurisée de Render pour le proxy_pass d'Nginx
-        value: http://julien-food-api:3000
