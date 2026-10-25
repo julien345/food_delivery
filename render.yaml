@@ -49,6 +49,6 @@ services:
     envVars:
       - key: PORT
         value: 80
-      - key: BACKEND_URL
+      - key: VITE_API_URL
         # Utilise l'URL réseau privée et sécurisée de Render pour le proxy_pass d'Nginx
         value: http://julien-food-api:3000
