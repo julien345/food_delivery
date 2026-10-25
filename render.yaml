@@ -45,7 +45,7 @@ services:
     plan: free
     region: frankfurt
     image:
-      url: ghcr.io/julien345/food_delivery-web:latest # Ajustez le nom de l'image si nécessaire
+      url:food_delivery-frontend:latest # Ajustez le nom de l'image si nécessaire
     envVars:
       - key: PORT
         value: 80
