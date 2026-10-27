@@ -46,8 +46,8 @@ services:
     repo: https://github.com
     branch: main
     dockerfilePath: Frontend/Dockerfile
+    envVars:
       - key: VITE_API_URL
         value: https://onrender.com
-    envVars:
       - key: PORT
         value: 80
