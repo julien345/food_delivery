@@ -46,9 +46,6 @@ services:
     repo: https://github.com
     branch: main
     dockerfilePath: Frontend/Dockerfile
-    # On laisse le Root Directory vide par défaut pour donner tout le contexte à Docker
-    # On passe l'URL publique de l'API à l'instruction ARG de votre Dockerfile
-    buildArgs:
       - key: VITE_API_URL
         value: https://onrender.com
     envVars:
