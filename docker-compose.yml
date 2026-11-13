@@ -31,6 +31,8 @@ services:
   # --- 3. FRONTEND (REACT / TS + NGINX) ---
   web:
     build: ./Frontend
+    environment:
+      API_HOSTPORT: api:3000
     container_name: julien-web
     # Nginx a besoin que l'API ait démarré pour pouvoir rediriger les requêtes
     depends_on:
