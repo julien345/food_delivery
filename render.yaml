@@ -44,11 +44,10 @@ services:
       url: ghcr.io/julien345/food_delivery-frontend:latest
     envVars:
       - key: API_HOSTPORT
-      
+        value: https://julien-food-api-r65j.onrender.com
         fromService:
           type: web
           name: julien-food-api
           property: hostport
       - key: PORT
-        value: https://julien-food-api-r65j.onrender.com
         value: 80
