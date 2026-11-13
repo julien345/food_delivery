@@ -37,17 +37,19 @@ services:
       - key: FRONTEND_URL
         sync: false
 
-  # --- 2. FRONTEND (Compilé directement par Render) ---
+  # --- 2. FRONTEND (via votre image GHCR + Nginx) ---
   - type: web
     name: julien-food-web
-    runtime: docker
+    runtime: image
     plan: free
     region: frankfurt
-    repo: https://github.com
-    branch: main
-    dockerfilePath: Frontend/Dockerfile
+    image:
+      url: ghcr.io/julien345/food_delivery-frontend:latest
     envVars:
-      - key: VITE_API_URL
-        value: https://onrender.com
+      - key: API_HOSTPORT
+        fromService:
+          type: web
+          name: julien-food-api
+          property: hostport
       - key: PORT
         value: 80
