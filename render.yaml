@@ -19,6 +19,8 @@ services:
         fromDatabase:
           name: julien-food-db
           property: connectionString
+      - key: FRONTEND_URL
+        value: https://julien-food-web-r65j.onrender.com
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
@@ -42,10 +44,10 @@ services:
     region: frankfurt
     image:
       url: ghcr.io/julien345/food_delivery-frontend:latest
-    dockerCommand: |
-      sh -c 'sed -i "s|http://\${API_HOSTPORT}|https://\${API_HOSTPORT}|g; s|Host \$host;|Host \$proxy_host; proxy_ssl_server_name on; client_max_body_size 5M;|g" /etc/nginx/templates/default.conf.template && exec /docker-entrypoint.sh nginx -g "daemon off;"'
     envVars:
-      - key: API_HOSTPORT
-        value: ://.onrender.com
       - key: PORT
-        value: 80
+        value: "80"
+      - key: API_URL
+        value: https://julien-food-api-r65j.onrender.com
+      - key: API_HOST
+        value: julien-food-api-r65j.onrender.com

@@ -16,6 +16,8 @@ RUN npm run build
 
 # --- Étape 2 : Nginx sert les fichiers statiques ---
 FROM nginx:stable-alpine
+ENV API_URL=http://api:3000
+ENV API_HOST=api
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/dist /usr/share/nginx/html
 EXPOSE 80
