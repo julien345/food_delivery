@@ -20,7 +20,7 @@ services:
           name: julien-food-db
           property: connectionString
       - key: FRONTEND_URL
-        value: https://julien-food-web-r65j.onrender.com
+        value: https://food-delivery-382v.vercel.app
       - key: JWT_ACCESS_SECRET
         sync: false
       - key: JWT_REFRESH_SECRET
