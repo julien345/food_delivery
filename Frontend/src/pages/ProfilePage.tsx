@@ -76,9 +76,6 @@ export const ProfilePage: React.FC = () => {
                 <span>{user?.phone ? user.phone : 'Numéro non renseigné'}</span>
               </p>
               <div className="mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                  <Shield className="w-3 h-3" /> Rôle : {user?.role}
-                </span>
               </div>
             </div>
           </div>
