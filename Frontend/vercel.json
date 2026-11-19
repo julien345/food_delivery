@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/API/:path*",
-      "destination": "https://julien-food-api-r65j.onrender.com*"
+      "destination": "https://julien-food-api-r65j.onrender.com/API/:path*"
     },
     {
       "source": "/(.*)",
